@@ -25,3 +25,6 @@
 # Claude and Artificial Intelligence
 CLAUDE.md
 .claude/
+
+# Wrangler local state
+worker/.wrangler/
