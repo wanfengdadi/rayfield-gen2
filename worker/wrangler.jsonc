@@ -6,8 +6,12 @@
 
   // Two paths, one Worker. The stable route already existed; the preview route
   // is the same code reading a different release.
+  //
+  // The trailing * matters: a route without one stops matching as soon as there is a
+  // query string, so /gen2?__fresh=1 fell through to the site Worker and got its 404
+  // page. It also means near-miss paths like /gen2x reach this Worker and get its
+  // plain-text "-- Not found" rather than a page of HTML aimed at a Roblox client.
   "routes": [
-    { "pattern": "sirius.menu/gen2", "zone_name": "sirius.menu" },
-    { "pattern": "sirius.menu/gen2-preview", "zone_name": "sirius.menu" }
+    { "pattern": "sirius.menu/gen2*", "zone_name": "sirius.menu" }
   ]
 }

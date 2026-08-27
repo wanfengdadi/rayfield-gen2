@@ -19,6 +19,7 @@ interface Env {}
 
 const OWNER_REPO = "SiriusSoftwareLtd/rayfield-gen2";
 const EDGE_TTL = 300;
+const CACHE_EPOCH = 2;
 
 type Channel = {
   asset: string;
@@ -62,10 +63,20 @@ export default {
 
     // Keyed per channel. A shared key would let whichever channel was asked for
     // first answer for both until the entry expired.
-    const cacheKey = new Request(url.origin + path, { method: "GET" });
+    //
+    // CACHE_EPOCH is part of the key so a deploy can orphan every existing entry. An
+    // entry is served back verbatim, its own cache-control included, so one written
+    // under an older TTL keeps re-asserting that TTL until it expires on its own terms
+    // - a stale 4-hour entry outlived the 5-minute value here for hours. Bump this
+    // whenever the shape or lifetime of a cached response changes.
+    const cacheKey = new Request(`${url.origin}${path}?e=${CACHE_EPOCH}`, { method: "GET" });
     const cache = caches.default;
 
-    const cached = await cache.match(cacheKey);
+    // ?__fresh=1 skips the read so a release can be confirmed live immediately, rather
+    // than waiting out a TTL and guessing which layer is holding the old copy.
+    const bypass = url.searchParams.get("__fresh") === "1";
+
+    const cached = bypass ? undefined : await cache.match(cacheKey);
     if (cached) return cached;
 
     // No `cf.cacheEverything` here. The response cache below only ever stores a success,
