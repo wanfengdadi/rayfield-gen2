@@ -23,7 +23,7 @@ return function()
 
         -- the page is the window's height less the chrome above the elements frame, so a page
         -- of a given height is a window of that height plus the chrome
-        local windowChromeHeight = 106
+        local windowChromeHeight = windowSizing.profile("top").chromeHeight
 
         local function makePage(height)
             window.size = UDim2.fromOffset(400, height + windowChromeHeight)
@@ -126,7 +126,7 @@ return function()
             makeWindow()
             -- the shortest page the window can hand an element: the sizing floor less the chrome
             -- above the elements frame
-            local shortPage = 179
+            local shortPage = windowSizing.pageHeight(windowSizing.profile("top").minSize.Y, "top")
             local tab = makePage(shortPage)
             local drop = tab:CreateDropdown({ name = "Choice", options = options(9), forgetState = true })
 
@@ -181,7 +181,7 @@ return function()
             window.size = sized
 
             expect(unmeasured < measured).to.equal(true)
-            expect(unmeasured < windowSizing.minSize.Y).to.equal(true)
+            expect(unmeasured < windowSizing.profile("top").minSize.Y).to.equal(true)
         end)
 
         it("scrolls the options that dont fit rather than dropping them", function()
@@ -272,6 +272,116 @@ return function()
             drop:Refresh({ "Alpha", "Gamma" })
             expect(drop.value[1]).to.equal("Gamma")
             expect(#drop._optionFrames).to.equal(2)
+        end)
+
+        it("re-points a reused row at its new option, not the one it was built for", function()
+            makeWindow()
+            local tab = makePage(500)
+            local picked
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma" },
+                forgetState = true,
+                callback = function(value)
+                    picked = value
+                end,
+            })
+
+            local firstRow = drop._optionFrames[1].frame
+            drop:Refresh({ "Delta", "Epsilon", "Zeta" })
+
+            -- the rows are the same instances: nothing was torn down to do this
+            expect(drop._optionFrames[1].frame).to.equal(firstRow)
+            expect(#drop._optionFrames).to.equal(3)
+
+            -- and every one now reads, shows and selects its new option
+            expect(drop._optionFrames[1].name).to.equal("Delta")
+            expect(drop._optionFrames[1].title.Text).to.equal("Delta")
+            expect(drop._optionFrames[3].name).to.equal("Zeta")
+
+            -- the wire that matters: clicking a reused row must pick the option it now shows
+            drop:_open()
+            drop._optionFrames[1].interact.MouseButton1Click:Fire()
+            expect(drop.value[1]).to.equal("Delta")
+            expect(picked).to.equal("Delta")
+        end)
+
+        it("keeps the rows in the order the options were given", function()
+            makeWindow()
+            local tab = makePage(500)
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta" },
+                forgetState = true,
+            })
+
+            drop:Refresh({ "One", "Two", "Three", "Four" })
+            for index, name in { "One", "Two", "Three", "Four" } do
+                expect(drop._optionFrames[index].name).to.equal(name)
+                expect(drop._optionFrames[index].frame.LayoutOrder).to.equal(index)
+            end
+        end)
+
+        it("drops the rows it no longer needs and builds the ones it does", function()
+            makeWindow()
+            local tab = makePage(500)
+            local drop = tab:CreateDropdown({ name = "Choice", options = options(6), forgetState = true })
+
+            local kept = drop._optionFrames[1].frame
+            local surplus = drop._optionFrames[6].frame
+
+            drop:Refresh(options(2))
+            expect(#drop._optionFrames).to.equal(2)
+            expect(drop._optionFrames[1].frame).to.equal(kept) -- reused
+            expect(surplus.Parent).to.equal(nil) -- and the rest actually went
+
+            drop:Refresh(options(5))
+            expect(#drop._optionFrames).to.equal(5)
+            expect(drop._optionFrames[1].frame).to.equal(kept)
+            expect(drop._optionFrames[5].name).to.equal("Option 5")
+        end)
+
+        it("still fires the callback only when the visible selection moved", function()
+            makeWindow()
+            local tab = makePage(500)
+            local fired = 0
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta" },
+                value = "Alpha",
+                forgetState = true,
+                callback = function()
+                    fired += 1
+                end,
+            })
+            fired = 0
+
+            -- Alpha survives, so nothing the dev can see changed
+            drop:Refresh({ "Alpha", "Gamma" })
+            expect(fired).to.equal(0)
+            expect(drop.value[1]).to.equal("Alpha")
+
+            -- Alpha is gone, so it did
+            drop:Refresh({ "Gamma", "Delta" })
+            expect(fired).to.equal(1)
+            expect(#drop.value).to.equal(0)
+        end)
+
+        it("leaves no dead connections behind on the rows it drops", function()
+            makeWindow()
+            local tab = makePage(500)
+            local drop = tab:CreateDropdown({ name = "Choice", options = options(10), forgetState = true })
+
+            local before = #drop.connections
+            drop:Refresh(options(3))
+            -- seven rows went, and their connections went with them
+            expect(#drop.connections < before).to.equal(true)
+
+            drop:Refresh(options(10))
+            drop:Refresh(options(10)) -- same length twice over: nothing should accumulate
+            local settled = #drop.connections
+            drop:Refresh(options(10))
+            expect(#drop.connections).to.equal(settled)
         end)
 
         it("prunes only the removed option from what it still wants", function()

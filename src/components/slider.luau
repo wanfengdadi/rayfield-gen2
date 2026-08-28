@@ -17,6 +17,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
+local lockable = require(utility.lockable)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 
@@ -595,6 +596,13 @@ end
 -- the transparencies, _renderProgress owns Position and the fill. Handing the move over here keeps
 -- that true while still putting the pill where its new width wants it.
 function Slider:_setHeld(held)
+    -- the press already fires with dragging true (the flag is set before the value lands), so
+    -- only the release needs a call of its own: it's the one that says the gesture is over.
+    -- _endDrag guards on self.dragging, so this can only follow a real drag.
+    if not held then
+        self:_fireCallback(self.value)
+    end
+
     local target = if held then handleHeld else handleRest
     self._handleWidth = target.X
 
@@ -608,9 +616,11 @@ function Slider:_setHeld(held)
     self:_renderProgress(heldInfo)
 end
 
--- pcall + debounced error-flash via Window:_runGuarded (fires every drag frame)
+-- pcall + debounced error-flash via Window:_runGuarded (fires every drag frame). The second
+-- argument says whether the handle is still down, so a callback can show a preview while the
+-- value is moving and commit once it settles.
 function Slider:_fireCallback(value)
-    self.window:_runGuarded(self, self.callback, value)
+    self.window:_runGuarded(self, self.callback, value, self.dragging == true)
 end
 
 function Slider:Set(value, skipCallback)
@@ -687,5 +697,6 @@ function Slider:_minWidth()
 end
 
 moveable(Slider)
+lockable(Slider)
 
 return Slider

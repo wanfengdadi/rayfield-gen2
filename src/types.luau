@@ -31,6 +31,9 @@ export type WindowProps = {
     icon: (string | number)?,
     showName: string?,
     showIcon: (string | number)?,
+    showIconOnly: boolean?, -- collapse to a round icon badge instead of an icon-and-label pill
+    sidebarLayout: boolean?, -- tabs down the left instead of across the top
+    profile: string?, -- the line under the player's name in the sidebar; empty leaves the name alone
     configuration: WindowConfiguration?,
     fallbackFont: (Font | Enum.Font)?, -- built-in stand-in shown in secure mode while the brand font downloads
     locale: string?, -- pin the UI language; defaults to the player's Roblox locale
@@ -100,7 +103,8 @@ export type SliderProps = {
     suffix: string?,
     minimal: boolean?, -- track only, no name/value (for dense rows)
     forgetState: boolean?,
-    callback: ((value: number) -> ())?,
+    -- dragging is true from the moment the handle is grabbed until it's let go
+    callback: ((value: number, dragging: boolean) -> ())?,
 }
 
 export type DropdownProps = {
@@ -166,6 +170,28 @@ export type StatProps = {
     changeMode: string?, -- "percentage" | "absolute"
     changeBaseline: string?, -- "previous" | "initial"
     numberEasing: boolean?,
+}
+
+export type ProgressProps = {
+    name: string?,
+    description: string?,
+    icon: (string | number)?,
+    range: { number }?, -- { min, max }, defaulting to { 0, 1 } (or { 0, steps })
+    value: number?,
+    steps: number?, -- draw the track as this many segments instead of one continuous fill
+    text: string?, -- a fixed readout beside the title
+    format: ((value: number, min: number, max: number) -> string)?, -- build the readout yourself
+    showValue: boolean?, -- false hides the readout entirely (default true)
+    indeterminate: boolean?, -- a sweep instead of a value, for work of unknown length
+}
+
+export type CodeProps = {
+    name: string?,
+    description: string?,
+    text: string?, -- the body
+    height: number?, -- how tall the block stands, in pixels (default 120)
+    follow: boolean?, -- jump to the newest line on Append, the way a console does
+    maxLines: number?, -- how many lines to keep; past this the oldest roll off (default 200)
 }
 
 export type NotifyProps = {

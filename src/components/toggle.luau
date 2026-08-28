@@ -16,6 +16,7 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
+local lockable = require(utility.lockable)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 
@@ -497,6 +498,7 @@ function Toggle:_minWidth()
 end
 
 moveable(Toggle)
+lockable(Toggle)
 
 function Toggle:Set(value, skipCallback)
     local changed = self.value ~= value

@@ -28,17 +28,14 @@ local translations = {
 local window = Rayfield:CreateWindow({
     name = "Example",
     subtitle = "Rayfield Gen2",
-    theme = "cobalt",
     translations = translations,
+    sidebarLayout = false, -- flip this for tabs down the left instead of across the top
     configuration = {
         autoSave = true,
         autoLoad = true,
         fileName = "ExampleConfigFile",
     },
 })
-
--- Topbar tag, next to the window title.
-window:CreateTag({ text = "Beta", color = Color3.fromRGB(255, 175, 15) })
 
 -- Home ----------------------------------------------------------------------
 local home = window:CreateTab({ name = "Home", icon = 93364949241311 })
@@ -300,6 +297,110 @@ language:CreateDropdown({
             })
         end
         window:SetLocale(localeIds[value] or "en")
+    end,
+})
+
+-- What's new -----------------------------------------------------------------
+local whatsNew = window:CreateTab({ name = "What's New", icon = 93364949241311 })
+
+whatsNew:CreateSection({ name = "Progress" })
+
+local download = whatsNew:CreateProgress({
+    name = "Download",
+    description = "Takes a range like a slider does. The readout is a percentage unless you give it a line of your own.",
+    range = { 0, 100 },
+    value = 35,
+    format = function(value, _, max)
+        return string.format("%d of %d MB", value, max)
+    end,
+})
+
+whatsNew:CreateProgress({
+    name = "Setup",
+    description = "A stepped bar counts stages instead of distance.",
+    steps = 5,
+    value = 2,
+})
+
+whatsNew:CreateProgress({
+    name = "Syncing",
+    text = "Please wait",
+    indeterminate = true, -- a sweep, for work with no known length
+})
+
+whatsNew:CreateSlider({
+    name = "Download progress",
+    description = "Drives the bar above. The slider now tells its callback whether you are still dragging.",
+    range = { 0, 100 },
+    value = 35,
+    suffix = "%",
+    forgetState = true,
+    callback = function(value, dragging)
+        download:Set(value)
+        download:SetText(if dragging then "Downloading" else nil)
+    end,
+})
+
+whatsNew:CreateSection({ name = "Output" })
+
+local console = whatsNew:CreateCode({
+    name = "Console",
+    text = "-- output lands here",
+    height = 130,
+    follow = true, -- pins itself to the newest line
+    maxLines = 50, -- past this the oldest roll off the top
+})
+
+whatsNew:CreateButton({
+    name = "Log a line",
+    description = "The block holds its height and scrolls inside itself, so the page never grows.",
+    callback = function()
+        console:Append(string.format("[%s] player joined", os.date("%H:%M:%S")))
+    end,
+})
+
+local group = whatsNew:CreateGroup()
+
+group:CreateButton({
+    name = "Copy",
+    callback = function()
+        window:Notify({
+            title = if console:Copy() then "Copied" else "No clipboard here",
+            content = "Copy needs an executor that provides setclipboard.",
+        })
+    end,
+})
+
+group:CreateButton({
+    name = "Clear",
+    callback = function()
+        console:Clear()
+    end,
+})
+
+whatsNew:CreateSection({ name = "Locking" })
+
+local lockable = whatsNew:CreateToggle({
+    name = "Auto Farm",
+    description = "Lock this and it dims, stops taking input, and never fires its callback.",
+    value = false,
+    forgetState = true,
+    callback = function(state)
+        print("this never runs while the toggle is locked", state)
+    end,
+})
+
+whatsNew:CreateToggle({
+    name = "Lock Auto Farm",
+    description = "Locking is what a key check or a missing dependency should do to an element.",
+    value = false,
+    forgetState = true,
+    callback = function(state)
+        if state then
+            lockable:Lock("Needs a premium key")
+        else
+            lockable:Unlock()
+        end
     end,
 })
 

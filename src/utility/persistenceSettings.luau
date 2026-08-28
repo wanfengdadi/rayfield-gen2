@@ -20,6 +20,7 @@ type SettingsWindow = {
         keepOnScreen: boolean,
         welcomeToast: boolean,
         haptics: boolean,
+        showProfile: boolean,
     },
 }
 
@@ -29,6 +30,7 @@ type DecodedSettings = {
     keepOnScreen: unknown?,
     welcomeToast: unknown?,
     haptics: unknown?,
+    showProfile: unknown?,
 }
 
 function persistenceSettings.getSettingsPath(): (string, string)
@@ -47,6 +49,7 @@ function persistenceSettings.saveSettings(window: SettingsWindow): boolean
         keepOnScreen = window.settings.keepOnScreen,
         welcomeToast = window.settings.welcomeToast,
         haptics = window.settings.haptics,
+        showProfile = window.settings.showProfile,
     }
 
     local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
@@ -133,6 +136,10 @@ function persistenceSettings.loadSettings(window: SettingsWindow): boolean
 
     if type(settings.haptics) == "boolean" then
         window.settings.haptics = settings.haptics
+    end
+
+    if type(settings.showProfile) == "boolean" then
+        window.settings.showProfile = settings.showProfile
     end
 
     return true

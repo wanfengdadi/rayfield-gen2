@@ -20,6 +20,7 @@ local constants = require(utility.constants)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 local windowSizing = require(utility.windowSizing)
+local lockable = require(utility.lockable)
 
 local chevronIcon = constants.icons.chevron
 local checkIcon = constants.icons.check
@@ -49,12 +50,6 @@ local cardPadding = cardPaddingTop + cardPaddingBottom
 
 -- Most rows we'll ever show at once. Past this the list scrolls rather than the card growing.
 local maxVisibleOptions = 4
-
--- The chrome above the elements frame (window.luau sizes it 1, -106), which the tab page fills.
--- Taken off the window's height that gives the page, and off windowSizing's floor it gives the
--- smallest page there can be - what a card falls back to before the window has a size.
-local windowChromeHeight = 106
-local minPageHeight = windowSizing.minSize.Y - windowChromeHeight
 
 -- The row of bulk actions a multi-select card carries above its list.
 local actionsHeight = 22
@@ -458,6 +453,9 @@ function Dropdown.new(tab, properties)
         local frame = self.window:Create("Frame", {
             Size = UDim2.new(1, -12, 0, optionHeight),
             BorderSizePixel = 0,
+            -- set explicitly: the list sorts on LayoutOrder, and a reused row has to be able to
+            -- take a new position without relying on the order it happened to be created in
+            LayoutOrder = #self._optionFrames + 1,
 
             BackgroundTransparency = 1,
 
@@ -547,7 +545,7 @@ function Dropdown.new(tab, properties)
                 if not self._isOpen or not self.window:_interactive() then
                     return
                 end
-                if isOptionSelected(optionName) then
+                if isOptionSelected(data.name) then
                     return
                 end
                 variables.tweenService
@@ -573,7 +571,7 @@ function Dropdown.new(tab, properties)
                 if not self._isOpen then
                     return
                 end
-                if isOptionSelected(optionName) then
+                if isOptionSelected(data.name) then
                     return
                 end
                 variables.tweenService
@@ -601,7 +599,7 @@ function Dropdown.new(tab, properties)
                     return
                 end
                 hapticEngine.click()
-                local sel = isOptionSelected(optionName)
+                local sel = isOptionSelected(data.name)
 
                 if not self.multiSelect then
                     if sel then
@@ -609,15 +607,15 @@ function Dropdown.new(tab, properties)
                         return
                     end
                     table.clear(self.value)
-                    table.insert(self.value, optionName)
+                    table.insert(self.value, data.name)
                 else
                     if sel then
-                        local idx = table.find(self.value, optionName)
+                        local idx = table.find(self.value, data.name)
                         if idx then
                             table.remove(self.value, idx)
                         end
                     else
-                        table.insert(self.value, optionName)
+                        table.insert(self.value, data.name)
                     end
                 end
 
@@ -1035,10 +1033,7 @@ end
 -- page's height without waiting on a layout pass to measure one.
 function Dropdown:_pageHeight(): number
     local size = self.window.size
-    if not size then
-        return minPageHeight
-    end
-    return size.Y.Offset - windowChromeHeight
+    return windowSizing.pageHeight(size and size.Y.Offset, self.window.layout.mode)
 end
 
 -- Open height sized to the options on screen (header + search + paddings + rows), so a search
@@ -1259,24 +1254,63 @@ function Dropdown:_deriveSelection()
     return not sameSelection(self.value, previous)
 end
 
+-- Point an existing row at a different option. Everything that reads the option reads
+-- data.name, so this is the whole of it; the row keeps its instances and its connections.
+function Dropdown:_rebindOption(data, name, index)
+    data.name = name
+    data.title.Text = name
+    data.frame.LayoutOrder = index
+end
+
+-- Tear down every row from `first` on, in one pass. One at a time means re-walking the
+-- window's whole instance list per row, which is what makes a big shrink expensive.
+function Dropdown:_destroyOptionsFrom(first)
+    local roots, connections = {}, {}
+
+    for index = #self._optionFrames, first, -1 do
+        local data = self._optionFrames[index]
+        table.insert(roots, data.frame)
+        if data.connections then
+            table.move(data.connections, 1, #data.connections, #connections + 1, connections)
+            data.connections = nil
+        end
+        self._optionFrames[index] = nil
+    end
+
+    self.window:DisconnectMany(self, connections)
+    self.window:DestroySubtrees(roots)
+end
+
 function Dropdown:Refresh(newOptions)
     self.options = dedupStrings(newOptions or {})
 
-    for _, data in self._optionFrames do
-        self:_destroyOption(data)
-    end
-    table.clear(self._optionFrames)
-
     local selectionChanged = self:_deriveSelection()
 
-    for _, opt in self.options do
-        local data = self._buildOption(opt)
+    -- Rows are reused rather than torn down and rebuilt. Rebuilding a long list is the
+    -- expensive part by a wide margin, and it is pure waste when the row that would be
+    -- destroyed is identical to the one about to take its place.
+    local existing = #self._optionFrames
+    local wanted = #self.options
+
+    for index = 1, math.min(existing, wanted) do
+        self:_rebindOption(self._optionFrames[index], self.options[index], index)
+    end
+
+    for index = existing + 1, wanted do
+        local data = self._buildOption(self.options[index])
+        data.frame.LayoutOrder = index
         table.insert(self._optionFrames, data)
-        -- fresh frames default to the closed look, so paint the open state if the
-        -- panel is already open (otherwise they'd sit blank until hovered)
-        if self._isOpen then
-            self._renderOptionState(data, false)
-        end
+    end
+
+    if wanted < existing then
+        self:_destroyOptionsFrom(wanted + 1)
+    end
+
+    -- every row, reused or new: its selection may have moved, and a reused one may have been
+    -- left mid-hover. Closed paints exactly what a freshly built row starts at, so this is
+    -- right either way round.
+    for _, data in self._optionFrames do
+        self._renderOptionState(data, false)
     end
 
     self._updateSelectedLabel()
@@ -1423,5 +1457,7 @@ function Dropdown:MoveDown()
         self.tab:_moveElement(self, idx + 1)
     end
 end
+
+lockable(Dropdown)
 
 return Dropdown
