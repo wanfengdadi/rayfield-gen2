@@ -37,24 +37,25 @@ return function()
             expect(phoneWidth > top.defaultSize.X).to.equal(true)
         end)
 
-        it("caps the height at exactly 70% of the screen", function()
-            -- pinned, so lowering the cap fails here instead of sliding through the bounds
-            -- checks below. 360 lands a pixel under because 360 * 0.70 is not exact in floats.
-            local _, small = fit(800, 360)
-            expect(small).to.equal(251)
-            local _, medium = fit(844, 390)
-            expect(medium).to.equal(273)
-            local _, large = fit(955, 440)
-            expect(large).to.equal(308)
+        it("leaves exactly the topbar's room above, and gives the rest to the window", function()
+            -- pinned, so loosening the clearance fails here rather than sliding through the
+            -- bounds checks below. A centred window leaves half the slack above it, so the
+            -- height is the screen less twice the clearance.
+            for _, viewport in { Vector2.new(800, 360), Vector2.new(844, 390), Vector2.new(955, 440) } do
+                local _, height = fit(viewport.X, viewport.Y)
+                expect(height).to.equal(viewport.Y - top.topbarClearance * 2)
+            end
+
+            -- once the screen is tall enough, the ideal height is what caps it instead
             local _, windowed = fit(1280, 600)
-            expect(windowed).to.equal(420)
+            expect(windowed).to.equal(top.defaultSize.Y)
         end)
 
-        it("keeps a phone inside the occupancy caps", function()
+        it("keeps a phone inside the caps that still apply", function()
             for _, viewport in { Vector2.new(667, 375), Vector2.new(844, 390), Vector2.new(720, 360) } do
                 local width, height = fit(viewport.X, viewport.Y)
-                expect(width <= viewport.X * 0.86).to.equal(true)
-                expect(height <= viewport.Y * 0.70).to.equal(true)
+                expect(width <= viewport.X * top.maxOccupancyX).to.equal(true)
+                expect(height <= viewport.Y - top.topbarClearance * 2).to.equal(true)
             end
         end)
 
@@ -83,7 +84,7 @@ return function()
                 { Vector2.new(1200, 240), Vector2.new(400, 201), Vector2.new(640, 260), Vector2.new(900, 300) }
             do
                 local width, height = fit(viewport.X, viewport.Y)
-                expect(width <= height * 1.95).to.equal(true)
+                expect(width <= height * top.maxAspectRatio).to.equal(true)
             end
         end)
 
@@ -105,13 +106,13 @@ return function()
             expect(shortWidth <= 1200).to.equal(true)
         end)
 
-        it("holds the occupancy caps down to the smallest believed viewport", function()
+        it("holds the caps down to the smallest believed viewport", function()
             for _, viewport in
                 { Vector2.new(200, 200), Vector2.new(240, 700), Vector2.new(1200, 240), Vector2.new(210, 380) }
             do
                 local width, height = fit(viewport.X, viewport.Y)
-                expect(width <= viewport.X * 0.86).to.equal(true)
-                expect(height <= viewport.Y * 0.70).to.equal(true)
+                expect(width <= viewport.X * top.maxOccupancyX).to.equal(true)
+                expect(height <= viewport.Y - top.topbarClearance * 2).to.equal(true)
             end
         end)
 

@@ -27,9 +27,14 @@ export type Profile = {
     -- plain numbers, not a Vector2: its components are 32 bit, so 0.70 would come back as
     -- 0.69999998 and the cap would sit a pixel under what it says on some screens
     maxOccupancyX: number,
-    maxOccupancyY: number,
+    maxOccupancyY: number?,
     marginFloorX: number,
     marginFloorY: number,
+
+    -- Room to leave above a centred window for the Roblox topbar. Where this is set it takes
+    -- the place of a vertical fraction: it is the thing the fraction was standing in for, and
+    -- it does not give away half a phone screen to express it.
+    topbarClearance: number?,
 
     -- How wide the window is ever allowed to read against its own height, and (sidebar only)
     -- how narrow, so a landscape window never turns portrait on the way down.
@@ -53,16 +58,22 @@ local profiles = {
         defaultSize = Vector2.new(475, 500),
         minSize = Vector2.new(300, 285),
 
-        -- The vertical cap is deliberately the tighter of the two - an open window should
-        -- always read as sitting on the screen rather than filling it, and it also clears the
-        -- Roblox topbar for free, since a centred window leaves 15% above it.
+        -- Height is bounded by the topbar rather than by a fraction. A flat 70% was chosen so a
+        -- centred window cleared the Roblox topbar, but on a phone that gave away far more than
+        -- the topbar needs: 273px of a 390px screen, leaving four rows of content. Asking for
+        -- the clearance directly keeps the same gap above and hands the rest back. On a big
+        -- screen nothing changes, because the ideal height caps it long before this does.
         maxOccupancyX = 0.86,
-        maxOccupancyY = 0.70,
+        topbarClearance = 36,
         marginFloorX = 24,
         marginFloorY = 28,
 
-        maxAspectRatio = 1.95,
-        widthCompensation = 80,
+        -- A landscape phone leaves plenty of width spare, and the window could not reach it:
+        -- at a phone's height the aspect ceiling bound the width long before the screen did.
+        -- Both are raised together so a short screen gets a usably wide window, while a roomy
+        -- one is untouched - the compensation only applies once height has actually been lost.
+        maxAspectRatio = 2.3,
+        widthCompensation = 130,
 
         chromeHeight = layouts.top.chromeHeight,
     } :: Profile,
@@ -100,6 +111,19 @@ function windowSizing.pageHeight(windowHeight: number?, mode: layouts.Mode?): nu
     local profile = windowSizing.profile(mode)
     local height = if windowHeight and windowHeight > 0 then windowHeight else profile.minSize.Y
     return math.max(height - profile.chromeHeight, 0)
+end
+
+-- How much height this screen will give. Whichever bound the profile declares applies; a
+-- profile with both gets the tighter of the two.
+local function availableHeight(profile: Profile, viewportY: number): number
+    local limit = viewportY - profile.marginFloorY
+    if profile.topbarClearance then
+        limit = math.min(limit, viewportY - profile.topbarClearance * 2)
+    end
+    if profile.maxOccupancyY then
+        limit = math.min(limit, viewportY * profile.maxOccupancyY)
+    end
+    return limit
 end
 
 -- How much of an axis we had to give up, 0 on a screen big enough and 1 once pinned to the floor.
@@ -148,7 +172,7 @@ function windowSizing.fit(viewport: Vector2?, mode: layouts.Mode?): UDim2
     end
 
     local availableX = math.min(viewport.X * profile.maxOccupancyX, viewport.X - profile.marginFloorX)
-    local availableY = math.min(viewport.Y * profile.maxOccupancyY, viewport.Y - profile.marginFloorY)
+    local availableY = availableHeight(profile, viewport.Y)
 
     if profile.minAspectRatio then
         return fitHorizontal(profile, availableX, availableY)
