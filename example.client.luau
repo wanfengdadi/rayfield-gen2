@@ -343,7 +343,7 @@ whatsNew:CreateSlider({
 
 whatsNew:CreateSection({ name = "Output" })
 
-local console = whatsNew:CreateCode({
+local console = whatsNew:CreateConsole({
     name = "Console",
     text = "-- output lands here",
     height = 130,

@@ -273,9 +273,9 @@ function Tab:CreateProgress(properties)
     return self:_register(require(script.Parent.progress).new(self, properties))
 end
 
--- Code / log block
-function Tab:CreateCode(properties)
-    return self:_register(require(script.Parent.code).new(self, properties))
+-- Console / code block
+function Tab:CreateConsole(properties)
+    return self:_register(require(script.Parent.console).new(self, properties))
 end
 
 function Tab:CreateStat(properties)

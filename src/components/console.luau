@@ -13,9 +13,9 @@
 -- scroll. A row each keeps every label short enough that its own height is never the thing
 -- being clamped, and the list layout measures the canvas for us.
 
-local Code = {}
-Code.__index = Code
-Code.__type = "Code"
+local Console = {}
+Console.__index = Console
+Console.__type = "Console"
 
 -- Utility
 local utility = script.Parent.Parent.utility
@@ -37,9 +37,9 @@ local lineHeight = 1.25 -- dense, the way a real log reads
 local defaultMaxLines = 200
 
 -- Monospace, so columns line up. Not the brand font: this is output, not copy.
-local codeFont = Font.fromEnum(Enum.Font.Code)
+local monoFont = Font.fromEnum(Enum.Font.Code)
 
-function Code.new(tab, properties)
+function Console.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
     local self = setmetatable({
@@ -61,10 +61,10 @@ function Code.new(tab, properties)
         head = 1, -- the pooled label holding the oldest line
         nextOrder = 1,
         textDirty = true,
-    }, Code)
+    }, Console)
 
     self:_build()
-    self:_setLines(properties.text or properties.Text or properties.code or properties.Code or "")
+    self:_setLines(properties.text or properties.Text or "")
 
     if self.description then
         self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
@@ -75,7 +75,7 @@ end
 
 -- The body as one string. Built on demand: joining every line on each append would put an O(n)
 -- cost on the one path that has to stay cheap.
-function Code:Get(): string
+function Console:Get(): string
     if self.textDirty then
         self.text = table.concat(self.lines, "\n")
         self.textDirty = false
@@ -84,7 +84,7 @@ function Code:Get(): string
 end
 
 -- Split a body into lines and keep only the newest maxLines of them.
-function Code:_setLines(text)
+function Console:_setLines(text)
     text = if type(text) == "string" then text else tostring(text)
 
     table.clear(self.lines)
@@ -99,7 +99,7 @@ end
 
 -- Drop from the front until the buffer fits. table.move rather than repeated table.remove, so
 -- a burst of output doesn't turn into a quadratic shuffle.
-function Code:_trim()
+function Console:_trim()
     local excess = #self.lines - self.maxLines
     if excess <= 0 then
         return
@@ -111,13 +111,13 @@ function Code:_trim()
 end
 
 -- A row for a line. Created once and then recycled; the pool never exceeds maxLines.
-function Code:_makeLabel()
+function Console:_makeLabel()
     return self.window:Create("TextLabel", {
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        FontFace = codeFont,
+        FontFace = monoFont,
         TextSize = textSize,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top,
@@ -139,7 +139,7 @@ end
 
 -- Rebuild every row from the buffer. Only the paths that replace the whole body use this;
 -- Append has its own O(1) route below.
-function Code:_flush()
+function Console:_flush()
     self.textDirty = true
 
     for index, line in self.lines do
@@ -164,7 +164,7 @@ end
 
 -- One line, one label write. At capacity the oldest row is recycled into the newest position
 -- rather than every row shuffling up, so the cost doesn't grow with the buffer.
-function Code:_pushLine(line: string)
+function Console:_pushLine(line: string)
     self.textDirty = true
 
     if #self.lines < self.maxLines then
@@ -196,13 +196,13 @@ function Code:_pushLine(line: string)
     self.head = (self.head % #self.lineLabels) + 1
 end
 
-function Code:_build()
+function Console:_build()
     local top = if self.name then titleHeight else 0
 
     self.main = self.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, self.height + top + padding * 2),
         BorderSizePixel = 0,
-        Name = self.name or "Code",
+        Name = self.name or "Console",
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 
         -- Animation
@@ -295,7 +295,7 @@ end
 
 -- Pin to the bottom. Asking for a position past the end is fine: Roblox clamps it to the real
 -- maximum, which saves working out the viewport height ourselves.
-function Code:_pin()
+function Console:_pin()
     local scroll = self.scroll
     if not scroll or not scroll.Parent then
         return
@@ -303,7 +303,7 @@ function Code:_pin()
     scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y)
 end
 
-function Code:_follow()
+function Console:_follow()
     if not self.follow then
         return
     end
@@ -315,7 +315,7 @@ end
 
 -- The canvas only settles a frame or two after the rows change, so pinning once on Append is a
 -- race. The layout's content size is the thing that actually moves, so follow that instead.
-function Code:_watchCanvas()
+function Console:_watchCanvas()
     self.window:ConnectFor(self, self.scrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
         if self.follow then
             self:_pin()
@@ -324,13 +324,13 @@ function Code:_watchCanvas()
 end
 
 -- Replace the whole body.
-function Code:Set(text)
+function Console:Set(text)
     self:_setLines(text)
 end
 
 -- Add a line to the end, the way a console does. Once the buffer is full the oldest line rolls
 -- off the top, so what you see is always the newest output.
-function Code:Append(line)
+function Console:Append(line)
     line = if type(line) == "string" then line else tostring(line)
     for part in string.gmatch(line .. "\n", "([^\n]*)\n") do
         self:_pushLine(part)
@@ -338,13 +338,13 @@ function Code:Append(line)
     self:_follow()
 end
 
-function Code:Clear()
+function Console:Clear()
     table.clear(self.lines)
     self:_flush()
 end
 
 -- Put the body on the clipboard, where the executor gives us one. Returns whether it landed.
-function Code:Copy(): boolean
+function Console:Copy(): boolean
     local clipboard = (getgenv and getgenv().setclipboard) or setclipboard
     if typeof(clipboard) ~= "function" then
         return false
@@ -353,14 +353,14 @@ function Code:Copy(): boolean
 end
 
 -- Change how tall the block stands. The panel takes the height; the element grows around it.
-function Code:SetHeight(height)
+function Console:SetHeight(height)
     self.height = math.max(tonumber(height) or defaultHeight, minHeight)
     local top = if self.name then titleHeight else 0
     self.panel.Size = UDim2.new(1, -padding * 2, 0, self.height)
     self.main.Size = UDim2.new(1, -20, 0, self.height + top + padding * 2)
 end
 
-function Code:_setShown(shown, animate)
+function Console:_setShown(shown, animate)
     local w = self.window
 
     -- no icon and (usually) no title, so the shared reveal doesn't fit; drive the parts directly
@@ -382,13 +382,13 @@ function Code:_setShown(shown, animate)
     end
 end
 
-function Code:Remove()
+function Console:Remove()
     if self.descriptor then
         self.descriptor:Remove()
     end
     self.main:Destroy()
 end
 
-moveable(Code)
+moveable(Console)
 
-return Code
+return Console

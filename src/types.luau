@@ -185,7 +185,7 @@ export type ProgressProps = {
     indeterminate: boolean?, -- a sweep instead of a value, for work of unknown length
 }
 
-export type CodeProps = {
+export type ConsoleProps = {
     name: string?,
     description: string?,
     text: string?, -- the body

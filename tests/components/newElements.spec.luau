@@ -9,7 +9,7 @@ return function()
         return math.abs(actual - expected) < 0.0001
     end
 
-    describe("component progress and code", function()
+    describe("component progress and console", function()
         local window
 
         local function makeTab(properties)
@@ -206,9 +206,9 @@ return function()
             end)
         end)
 
-        describe("code", function()
+        describe("console", function()
             it("holds the height it's given rather than growing with its content", function()
-                local block = makeTab():CreateCode({ name = "Console", height = 150 })
+                local block = makeTab():CreateConsole({ name = "Console", height = 150 })
                 local before = block.main.Size.Y.Offset
 
                 for index = 1, 40 do
@@ -222,7 +222,7 @@ return function()
             end)
 
             it("never stands shorter than it can usefully be", function()
-                local block = makeTab():CreateCode({ name = "Console", height = 4 })
+                local block = makeTab():CreateConsole({ name = "Console", height = 4 })
                 expect(block.height).to.equal(48)
 
                 block:SetHeight(300)
@@ -234,7 +234,7 @@ return function()
             end)
 
             it("appends, replaces and clears its body", function()
-                local block = makeTab():CreateCode({ text = "first" })
+                local block = makeTab():CreateConsole({ text = "first" })
 
                 block:Append("second")
                 expect(block:Get()).to.equal("first\nsecond")
@@ -252,7 +252,7 @@ return function()
             end)
 
             it("rolls the oldest lines off once it's full", function()
-                local block = makeTab():CreateCode({ name = "Console", maxLines = 3 })
+                local block = makeTab():CreateConsole({ name = "Console", maxLines = 3 })
                 block:Clear()
 
                 for index = 1, 6 do
@@ -264,7 +264,7 @@ return function()
             end)
 
             it("splits a multi-line append into lines so the cap still counts", function()
-                local block = makeTab():CreateCode({ maxLines = 2 })
+                local block = makeTab():CreateConsole({ maxLines = 2 })
                 block:Clear()
                 block:Append("one\ntwo\nthree")
 
@@ -273,12 +273,12 @@ return function()
             end)
 
             it("says so rather than throwing when there's no clipboard", function()
-                local block = makeTab():CreateCode({ text = "print()" })
+                local block = makeTab():CreateConsole({ text = "print()" })
                 expect(block:Copy()).to.equal(false) -- no executor here to provide one
             end)
 
             it("renders output as text, not markup", function()
-                local block = makeTab():CreateCode({ text = "<b>not bold</b>" })
+                local block = makeTab():CreateConsole({ text = "<b>not bold</b>" })
                 local row = block.lineLabels[1]
                 expect(row.RichText).to.equal(false)
                 expect(row.Text).to.equal("<b>not bold</b>")
@@ -286,7 +286,7 @@ return function()
             end)
 
             it("costs the same per line whether the buffer is empty or full", function()
-                local block = makeTab():CreateCode({ maxLines = 50 })
+                local block = makeTab():CreateConsole({ maxLines = 50 })
                 block:Clear()
 
                 -- fill it, then keep going: the pool stops growing and rows are recycled
@@ -309,8 +309,8 @@ return function()
 
             it("stands taller with a title than without one", function()
                 local tab = makeTab()
-                local titled = tab:CreateCode({ name = "Console", height = 100 })
-                local bare = tab:CreateCode({ height = 100 })
+                local titled = tab:CreateConsole({ name = "Console", height = 100 })
+                local bare = tab:CreateConsole({ height = 100 })
 
                 expect(titled.title).never.to.equal(nil)
                 expect(bare.title).to.equal(nil)
