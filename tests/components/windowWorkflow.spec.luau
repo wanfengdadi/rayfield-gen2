@@ -874,9 +874,12 @@ return function()
 
         describe("toast position", function()
             local originalWait = task.wait
+            local variables = helpers.requireUtility("variables")
+            local originalTweenCreate = variables.tweenService.Create
 
             afterEach(function()
                 task.wait = originalWait
+                variables.tweenService.Create = originalTweenCreate
             end)
 
             local function findLayout(container)
@@ -898,6 +901,49 @@ return function()
                 local layout = findLayout(w._toastsTop)
                 expect(layout).to.be.ok()
                 expect(layout.VerticalAlignment).to.equal(Enum.VerticalAlignment.Top)
+            end)
+
+            it("follows the pill after collapse and restore complete", function()
+                local w = makeWindow()
+                w:Toast({ title = "A", duration = 60 })
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
+
+                w.hidden = false
+                w.hasShownOnce = true
+
+                local motionCompletions = {}
+                local toastMoves = {}
+                variables.tweenService.Create = function(service, instance, info, targets)
+                    local tween = originalTweenCreate(service, instance, info, targets)
+                    if instance == w._toastsTop then
+                        table.insert(toastMoves, info)
+                    elseif instance == w.main and targets.Size and targets.Position then
+                        local completed = helpers.makeSignal()
+                        tween.Completed = completed
+                        tween.Play = function()
+                            for property, value in targets do
+                                instance[property] = value
+                            end
+                        end
+                        table.insert(motionCompletions, completed)
+                    end
+                    return tween
+                end
+
+                w:Hide()
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
+                expect(#toastMoves).to.equal(0)
+
+                motionCompletions[1]:Fire(Enum.PlaybackState.Completed)
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
+                expect(toastMoves[1][1]).to.equal(0.2)
+
+                w:Show()
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
+
+                motionCompletions[2]:Fire(Enum.PlaybackState.Completed)
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
+                expect(toastMoves[2][1]).to.equal(0.2)
             end)
 
             it("supports bottom with bottom-centre anchor and alignment", function()
