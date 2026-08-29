@@ -125,14 +125,7 @@ local function setTopToastPosition(window, animate)
         return
     end
 
-    local tween = variables.tweenService:Create(container, topToastMoveInfo, { Position = target })
-    window._topToastTween = tween
-    tween.Completed:Connect(function()
-        if window._topToastTween == tween then
-            window._topToastTween = nil
-        end
-    end)
-    tween:Play()
+    variables.tweenService:Create(container, topToastMoveInfo, { Position = target }):Play()
 end
 
 -- A subtle raised edge for a fill: lighten a dark fill, darken a light one.
@@ -982,9 +975,7 @@ function Window:Toast(properties)
         container = self:Create("Frame", {
             Name = "Toasts",
             Size = UDim2.new(0, maxToastWidth, 1, -24),
-            Position = if isTop
-                then if self._collapsedShown then topToastClosedPosition else topToastOpenPosition
-                else UDim2.new(0.5, 0, 1, -12),
+            Position = if isTop then topToastOpenPosition else UDim2.new(0.5, 0, 1, -12),
             AnchorPoint = if isTop then Vector2.new(0.5, 0) else Vector2.new(0.5, 1),
             BackgroundTransparency = 1,
             ZIndex = constants.zIndex.toast,
@@ -1004,6 +995,12 @@ function Window:Toast(properties)
         })
 
         self[containerKey] = container
+
+        -- the pill may already hold the top slot, so let the one rule place it rather than
+        -- restating it here. nothing's been on screen yet, so there's nothing to move
+        if isTop then
+            setTopToastPosition(self, false)
+        end
     end
 
     return require(script.Parent.toast).new(self, properties, container)
