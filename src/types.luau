@@ -244,19 +244,27 @@ export type Moveable = {
     MoveDown: (self: any) -> (),
 }
 
-export type Button = Moveable & {}
+-- Every element you can operate takes a lock: it dims, stops taking input, and its callback
+-- wont fire. Display-only elements dont have one.
+export type Lockable = {
+    Lock: (self: any, reason: string?) -> (),
+    Unlock: (self: any) -> (),
+    IsLocked: (self: any) -> boolean,
+}
 
-export type Toggle = Moveable & {
+export type Button = Moveable & Lockable & {}
+
+export type Toggle = Moveable & Lockable & {
     value: boolean,
     Set: (self: Toggle, value: boolean, skipCallback: boolean?) -> (),
 }
 
-export type Slider = Moveable & {
+export type Slider = Moveable & Lockable & {
     value: number,
     Set: (self: Slider, value: number, skipCallback: boolean?) -> (),
 }
 
-export type Dropdown = Moveable & {
+export type Dropdown = Moveable & Lockable & {
     value: { string }, -- always stored pruned to the current options, even single-select
     Set: (self: Dropdown, value: string | { string }, skipCallback: boolean?) -> (),
     Refresh: (self: Dropdown, options: { string }) -> (),
@@ -264,17 +272,17 @@ export type Dropdown = Moveable & {
     Remove: (self: Dropdown, option: string) -> (),
 }
 
-export type Input = Moveable & {
+export type Input = Moveable & Lockable & {
     value: string,
     Set: (self: Input, value: string, skipCallback: boolean?) -> (),
 }
 
-export type Keybind = Moveable & {
+export type Keybind = Moveable & Lockable & {
     value: EnumItem,
     Set: (self: Keybind, value: EnumItem | string, skipChanged: boolean?) -> (),
 }
 
-export type ColorPicker = Moveable & {
+export type ColorPicker = Moveable & Lockable & {
     value: Color3,
     alpha: number,
     Set: (self: ColorPicker, value: Color3 | string, skipCallback: boolean?) -> (),
@@ -285,6 +293,27 @@ export type Stat = Moveable & {
     value: number,
     Set: (self: Stat, value: number) -> (),
     ResetBaseline: (self: Stat, value: number?) -> (),
+}
+
+export type Progress = Moveable & {
+    value: number,
+    Set: (self: Progress, value: number) -> (),
+    Get: (self: Progress) -> number,
+    GetPercentage: (self: Progress) -> number, -- where the value sits in its range, 0 to 1
+    SetRange: (self: Progress, min: number, max: number) -> (),
+    SetText: (self: Progress, text: string?) -> (), -- nothing goes back to the formatter
+    SetIndeterminate: (self: Progress, state: boolean) -> (),
+    Remove: (self: Progress) -> (),
+}
+
+export type Console = Moveable & {
+    Set: (self: Console, text: string) -> (),
+    Append: (self: Console, line: string) -> (), -- multi-line splits, so the cap still counts
+    Clear: (self: Console) -> (),
+    Get: (self: Console) -> string,
+    Copy: (self: Console) -> boolean, -- false where the executor has no setclipboard
+    SetHeight: (self: Console, height: number) -> (),
+    Remove: (self: Console) -> (),
 }
 
 export type Section = Moveable & {}
@@ -344,6 +373,8 @@ export type Tab = {
     CreateKeybind: (self: Tab, props: KeybindProps) -> Keybind,
     CreateColorPicker: (self: Tab, props: ColorPickerProps) -> ColorPicker,
     CreateStat: (self: Tab, props: StatProps) -> Stat,
+    CreateProgress: (self: Tab, props: ProgressProps) -> Progress,
+    CreateConsole: (self: Tab, props: ConsoleProps) -> Console,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
     CreateText: (self: Tab, props: TextProps) -> Text,
     CreateDivider: (self: Tab, props: DividerProps?) -> Divider,

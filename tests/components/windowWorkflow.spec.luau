@@ -321,6 +321,11 @@ return function()
             expect(colorPicker:_serialize()).to.equal("00FF0040")
             colorPicker:_deserialize("336699cc")
             expect(colorPicker.alpha).to.equal(0.8)
+            -- a malformed hex leaves the element as it was rather than landing half of it:
+            -- the colour throws, and the alpha byte must not have been applied already
+            colorPicker:_deserialize("notacolour")
+            expect(colorPicker.alpha).to.equal(0.8)
+            expect(colorPicker.value).to.equal(Color3.fromHex("336699"))
 
             local stat = first:CreateStat({
                 name = "Users",
@@ -989,6 +994,50 @@ return function()
                 w:Toast({ Position = "bottom", title = "Low", duration = 1 })
                 expect(w._toastsBottom).to.be.ok()
                 expect(w._toastsTop).never.to.be.ok()
+            end)
+        end)
+
+        describe("collapse settling", function()
+            local variables = helpers.requireUtility("variables")
+            local originalTweenCreate = variables.tweenService.Create
+
+            afterEach(function()
+                variables.tweenService.Create = originalTweenCreate
+            end)
+
+            -- the collapse tween is the clock for handing input to the pill, so a tween that
+            -- stops short must still settle. otherwise animating stays up and Show, ToggleHide
+            -- and the toggle key all bail forever on a window nobody can get back.
+            it("settles even when the collapse motion is cancelled", function()
+                local w = makeWindow()
+                w.hidden = false
+                w.hasShownOnce = true
+
+                local motionCompletions = {}
+                variables.tweenService.Create = function(service, instance, info, targets)
+                    local tween = originalTweenCreate(service, instance, info, targets)
+                    if instance == w.main and targets.Size and targets.Position then
+                        local completed = helpers.makeSignal()
+                        tween.Completed = completed
+                        tween.Play = function()
+                            for property, value in targets do
+                                instance[property] = value
+                            end
+                        end
+                        table.insert(motionCompletions, completed)
+                    end
+                    return tween
+                end
+
+                w:Hide()
+                expect(w.animating).to.equal(true)
+                expect(w.collapsedInteract.Visible).to.equal(false)
+
+                motionCompletions[1]:Fire(Enum.PlaybackState.Cancelled)
+                expect(w.animating).to.equal(false)
+                expect(w._revealing).to.equal(false)
+                expect(w.collapsedInteract.Visible).to.equal(true)
+                expect(w._collapsedShown).to.equal(true)
             end)
         end)
     end)

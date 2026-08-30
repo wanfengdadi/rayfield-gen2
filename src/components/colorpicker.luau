@@ -1232,11 +1232,22 @@ end
 -- set silently first so the Set fires the callback just once, with the final colour and alpha.
 function ColorPicker:_deserialize(raw)
     local hex = tostring(raw)
+    local alpha = nil
     if #hex >= 8 then
-        self:SetAlpha((tonumber(hex:sub(7, 8), 16) or 255) / 255, true)
+        alpha = (tonumber(hex:sub(7, 8), 16) or 255) / 255
         hex = hex:sub(1, 6)
     end
-    self:Set(Color3.fromHex(hex))
+
+    -- resolve the colour before applying anything: fromHex throws on a malformed string, and
+    -- an alpha set first would stick while the colour fell back to the default
+    local ok, color = pcall(Color3.fromHex, hex)
+    if not ok then
+        return
+    end
+    if alpha then
+        self:SetAlpha(alpha, true)
+    end
+    self:Set(color)
 end
 
 function ColorPicker:_setShown(shown, animate)

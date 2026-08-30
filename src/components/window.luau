@@ -1107,8 +1107,10 @@ function Window:Hide()
     -- collapse into the pill in one continuous move - size and position tweened together
     -- so they stay perfectly in sync throughout
     local collapse = variables.tweenService:Create(self.main, moveInfo, { Size = size, Position = home })
-    collapse.Completed:Connect(function(state)
-        if state ~= Enum.PlaybackState.Completed or not self.hidden then
+    collapse.Completed:Connect(function()
+        -- any end to the collapse settles it, cancelled included. a tween that stops early
+        -- still has to hand input back, or the pill sits dead and Show can never run again
+        if self.unloaded or not self.hidden then
             return
         end
 
@@ -2002,8 +2004,8 @@ function Window:_quickRestore()
     -- tabs or bottom fade floating over a frame that isn't a window yet.
     chrome.setCollapsedShown(self, false, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
     local restore = variables.tweenService:Create(self.main, growInfo, { Size = self.size, Position = target })
-    restore.Completed:Connect(function(state)
-        if state ~= Enum.PlaybackState.Completed or self.hidden or self.unloaded then
+    restore.Completed:Connect(function()
+        if self.hidden or self.unloaded then
             return
         end
 
