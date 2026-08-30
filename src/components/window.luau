@@ -299,7 +299,7 @@ function Window.new(properties)
         mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
         keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
         welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
-        haptics = false, -- off by default; opt in from settings (buzzes on presses/notifications)
+        haptics = true, -- buzzes on presses and notifications; silent where the device has none
         showProfile = true, -- the player chip at the base of the sidebar rail
     }
 
