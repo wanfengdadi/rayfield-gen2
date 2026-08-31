@@ -75,8 +75,12 @@ local function setPillShown(window, shown, info)
     variables.tweenService:Create(window.searchInput, info, { TextTransparency = if shown then 0.2 else 1 }):Play()
 end
 
--- Show/hide the content tab pills as the strip swaps with the search field.
+-- Show/hide the content tab pills as the strip swaps with the search field. The sidebar rail
+-- isn't in the field's way, so it stays put and keeps showing where you were.
 local function setTabsShown(window, shown, info)
+    if window.layout.mode == "sidebar" then
+        return
+    end
     for _, tab in window.tabs do
         if not tab.neglectSelector and tab.topbarItem then
             tab:_applyVisual(
@@ -163,7 +167,7 @@ function search.open(window)
     -- strip swaps for the field
     setTabsShown(window, false, swapInfo)
     task.delay(swapInfo.Time, function()
-        if window._searching then
+        if window._searching and window.layout.mode ~= "sidebar" then
             window.tabList.Visible = false
         end
     end)
@@ -217,6 +221,13 @@ function search.toggle(window)
     end
 end
 
+-- Keep the field in step with the rail: it sits over the card, so it's as wide as the card is.
+function search.railWidth(window, width)
+    if window.searchPill then
+        window.searchPill.Size = UDim2.new(1, -(width + 30), 0, 35)
+    end
+end
+
 function search.build(window)
     window._searching = false
 
@@ -247,8 +258,10 @@ function search.build(window)
         Parent = window.searchPage,
     })
 
+    -- under a sidebar the field floats over the top of the card rather than replacing a strip,
+    -- so the results start below where it lands instead of under it
     window:Create("UIPadding", {
-        PaddingTop = UDim.new(0, 10),
+        PaddingTop = UDim.new(0, if window.layout.mode == "sidebar" then 53 else 10),
         PaddingBottom = UDim.new(0, 33),
 
         Parent = window.searchPage,
@@ -272,12 +285,18 @@ function search.build(window)
         Parent = window.main,
     }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
-    -- Search pill: takes the tab strip's row. Ported from Window.Search.
+    -- Search pill: takes the tab strip's row, or the head of the content card when the tabs
+    -- are down the side. Ported from Window.Search.
+    local sidebarLayout = window.layout.mode == "sidebar"
+    -- the strip's own row in the top layout; a hair inside the card's top edge in the sidebar,
+    -- where search.railWidth keeps the width in step with the rail as it collapses
+    local top = if sidebarLayout then window.layout.chromeHeight + 8 else window.layout.tabStripTop + 1
+
     window.searchPill = window:Create("Frame", {
         Name = "SearchBar",
-        AnchorPoint = Vector2.new(0.5, 0),
-        Position = UDim2.new(0.5, 0, 0, 66),
-        Size = UDim2.new(1, -35, 0, 35),
+        AnchorPoint = Vector2.new(if sidebarLayout then 1 else 0.5, 0),
+        Position = UDim2.new(if sidebarLayout then 1 else 0.5, if sidebarLayout then -15 else 0, 0, top),
+        Size = UDim2.new(1, if sidebarLayout then -(window.layout.railWidth + 30) else -35, 0, 35),
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
         ZIndex = 10,

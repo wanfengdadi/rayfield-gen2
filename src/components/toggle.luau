@@ -16,6 +16,7 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
+local lockable = require(utility.lockable)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 
@@ -491,11 +492,13 @@ function Toggle:_minWidth()
     if self.icon then
         w += 21 -- 16 icon + 5 gap
     end
-    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    -- measure what actually renders: the title shows the translated string
+    w += functions.textWidth(self.window.theme.Font, 16, locale.resolve(self.name))
     return w
 end
 
 moveable(Toggle)
+lockable(Toggle)
 
 function Toggle:Set(value, skipCallback)
     local changed = self.value ~= value

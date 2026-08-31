@@ -16,6 +16,7 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
+local lockable = require(utility.lockable)
 local locale = require(utility.locale)
 local constants = require(utility.constants)
 local hapticEngine = require(utility.HapticEngine)
@@ -232,7 +233,7 @@ function Input:_commit(text, silent)
     text = tostring(text)
     if self.numeric then
         local n = parseExp(text)
-        if not n or n == math.huge or n == -math.huge then
+        if not n or n ~= n or n == math.huge or n == -math.huge then
             -- invalid or non-finite number: revert the textbox to the previous value
             if self.input.Text ~= self.value then
                 self.input.Text = self.value
@@ -292,5 +293,6 @@ function Input:_refreshTheme()
 end
 
 moveable(Input)
+lockable(Input)
 
 return Input

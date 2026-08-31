@@ -54,6 +54,10 @@ globals:
     args:
     - required: false
       type: '...'
+  setclipboard:
+    args:
+    - required: false
+      type: '...'
 # these are functions that are defined when the testing framework is running, so we need to tell the lsp about them
   describe:
     args:

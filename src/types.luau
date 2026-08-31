@@ -31,6 +31,9 @@ export type WindowProps = {
     icon: (string | number)?,
     showName: string?,
     showIcon: (string | number)?,
+    showIconOnly: boolean?, -- collapse to a round icon badge instead of an icon-and-label pill
+    sidebarLayout: boolean?, -- tabs down the left instead of across the top
+    profile: string?, -- the line under the player's name in the sidebar; empty leaves the name alone
     configuration: WindowConfiguration?,
     fallbackFont: (Font | Enum.Font)?, -- built-in stand-in shown in secure mode while the brand font downloads
     locale: string?, -- pin the UI language; defaults to the player's Roblox locale
@@ -54,6 +57,18 @@ export type TagProps = {
 export type SectionProps = {
     name: string?,
     icon: (string | number)?,
+}
+
+export type TextProps = {
+    name: string?, -- the title above the body; either half can be left out
+    text: string?, -- the body
+    icon: (string | number)?,
+}
+
+export type DividerProps = {
+    text: string?, -- an optional word in the middle of the rule
+    spacing: number?, -- room above and below, in pixels
+    line: boolean?, -- false draws no rule, leaving only the room
 }
 
 export type GroupProps = {
@@ -88,7 +103,8 @@ export type SliderProps = {
     suffix: string?,
     minimal: boolean?, -- track only, no name/value (for dense rows)
     forgetState: boolean?,
-    callback: ((value: number) -> ())?,
+    -- dragging is true from the moment the handle is grabbed until it's let go
+    callback: ((value: number, dragging: boolean) -> ())?,
 }
 
 export type DropdownProps = {
@@ -156,6 +172,28 @@ export type StatProps = {
     numberEasing: boolean?,
 }
 
+export type ProgressProps = {
+    name: string?,
+    description: string?,
+    icon: (string | number)?,
+    range: { number }?, -- { min, max }, defaulting to { 0, 1 } (or { 0, steps })
+    value: number?,
+    steps: number?, -- draw the track as this many segments instead of one continuous fill
+    text: string?, -- a fixed readout beside the title
+    format: ((value: number, min: number, max: number) -> string)?, -- build the readout yourself
+    showValue: boolean?, -- false hides the readout entirely (default true)
+    indeterminate: boolean?, -- a sweep instead of a value, for work of unknown length
+}
+
+export type ConsoleProps = {
+    name: string?,
+    description: string?,
+    text: string?, -- the body
+    height: number?, -- how tall the block stands, in pixels (default 120)
+    follow: boolean?, -- jump to the newest line on Append, the way a console does
+    maxLines: number?, -- how many lines to keep; past this the oldest roll off (default 200)
+}
+
 export type NotifyProps = {
     title: string?,
     content: string?,
@@ -206,34 +244,45 @@ export type Moveable = {
     MoveDown: (self: any) -> (),
 }
 
-export type Button = Moveable & {}
+-- Every element you can operate takes a lock: it dims, stops taking input, and its callback
+-- wont fire. Display-only elements dont have one.
+export type Lockable = {
+    Lock: (self: any, reason: string?) -> (),
+    Unlock: (self: any) -> (),
+    IsLocked: (self: any) -> boolean,
+}
 
-export type Toggle = Moveable & {
+export type Button = Moveable & Lockable & {}
+
+export type Toggle = Moveable & Lockable & {
     value: boolean,
     Set: (self: Toggle, value: boolean, skipCallback: boolean?) -> (),
 }
 
-export type Slider = Moveable & {
+export type Slider = Moveable & Lockable & {
     value: number,
     Set: (self: Slider, value: number, skipCallback: boolean?) -> (),
 }
 
-export type Dropdown = Moveable & {
+export type Dropdown = Moveable & Lockable & {
     value: { string }, -- always stored pruned to the current options, even single-select
     Set: (self: Dropdown, value: string | { string }, skipCallback: boolean?) -> (),
+    Refresh: (self: Dropdown, options: { string }) -> (),
+    Add: (self: Dropdown, option: string) -> (),
+    Remove: (self: Dropdown, option: string) -> (),
 }
 
-export type Input = Moveable & {
+export type Input = Moveable & Lockable & {
     value: string,
     Set: (self: Input, value: string, skipCallback: boolean?) -> (),
 }
 
-export type Keybind = Moveable & {
+export type Keybind = Moveable & Lockable & {
     value: EnumItem,
     Set: (self: Keybind, value: EnumItem | string, skipChanged: boolean?) -> (),
 }
 
-export type ColorPicker = Moveable & {
+export type ColorPicker = Moveable & Lockable & {
     value: Color3,
     alpha: number,
     Set: (self: ColorPicker, value: Color3 | string, skipCallback: boolean?) -> (),
@@ -246,7 +295,46 @@ export type Stat = Moveable & {
     ResetBaseline: (self: Stat, value: number?) -> (),
 }
 
+export type Progress = Moveable & {
+    value: number,
+    Set: (self: Progress, value: number) -> (),
+    Get: (self: Progress) -> number,
+    GetPercentage: (self: Progress) -> number, -- where the value sits in its range, 0 to 1
+    SetRange: (self: Progress, min: number, max: number) -> (),
+    SetText: (self: Progress, text: string?) -> (), -- nothing goes back to the formatter
+    SetIndeterminate: (self: Progress, state: boolean) -> (),
+    Remove: (self: Progress) -> (),
+}
+
+export type Console = Moveable & {
+    Set: (self: Console, text: string) -> (),
+    Append: (self: Console, line: string) -> (), -- multi-line splits, so the cap still counts
+    Clear: (self: Console) -> (),
+    Get: (self: Console) -> string,
+    Copy: (self: Console) -> boolean, -- false where the executor has no setclipboard
+    SetHeight: (self: Console, height: number) -> (),
+    Remove: (self: Console) -> (),
+}
+
 export type Section = Moveable & {}
+
+-- A heading in the sidebar rail rather than in a tab's element list. Not Moveable: the rail
+-- orders itself by the order tabs and sections are created, the way tabs themselves do.
+export type TabSection = {
+    Remove: (self: TabSection) -> (),
+}
+
+export type Text = Moveable & {
+    name: string, -- the title
+    text: string, -- the body
+    Set: (self: Text, text: string) -> (),
+    SetTitle: (self: Text, title: string) -> (),
+}
+
+export type Divider = Moveable & {
+    text: string, -- "" when the rule carries no word
+    Set: (self: Divider, text: string?) -> (),
+}
 
 -- Tags sit in the window's title bar and order themselves, so they aren't Moveable.
 export type Tag = {
@@ -263,19 +351,25 @@ export type Popup = {
 
 -- A group lays elements along one axis and nests, so a row of columns builds a grid.
 -- A row accepts the compact elements (button/toggle/stat) + slider; a column also takes
--- dropdown and section. Input, keybind and colorpicker stay tab-level for now.
+-- dropdown, section, text and divider. Input, keybind and colorpicker stay tab-level for now.
 export type Group = Moveable & {
     CreateButton: (self: Group, props: ButtonProps) -> Button,
     CreateToggle: (self: Group, props: ToggleProps) -> Toggle,
     CreateSwitch: (self: Group, props: ToggleProps) -> Toggle,
     CreateStat: (self: Group, props: StatProps) -> Stat,
     CreateSlider: (self: Group, props: SliderProps) -> Slider,
-    CreateDropdown: (self: Group, props: DropdownProps) -> Dropdown,
-    CreateSection: (self: Group, props: SectionProps) -> Section,
+    -- nil on a row: only columns take these
+    CreateDropdown: (self: Group, props: DropdownProps) -> Dropdown?,
+    CreateSection: (self: Group, props: SectionProps) -> Section?,
+    CreateText: (self: Group, props: TextProps) -> Text?,
+    CreateDivider: (self: Group, props: DividerProps?) -> Divider?,
     CreateGroup: (self: Group, props: GroupProps?) -> Group,
 }
 
 export type Tab = {
+    Select: (self: Tab, noAnimation: boolean?) -> (),
+    Deselect: (self: Tab, noAnimation: boolean?) -> (),
+    Remove: (self: Tab) -> (),
     CreateButton: (self: Tab, props: ButtonProps) -> Button,
     CreateToggle: (self: Tab, props: ToggleProps) -> Toggle,
     CreateSwitch: (self: Tab, props: ToggleProps) -> Toggle,
@@ -285,17 +379,26 @@ export type Tab = {
     CreateKeybind: (self: Tab, props: KeybindProps) -> Keybind,
     CreateColorPicker: (self: Tab, props: ColorPickerProps) -> ColorPicker,
     CreateStat: (self: Tab, props: StatProps) -> Stat,
+    CreateProgress: (self: Tab, props: ProgressProps) -> Progress,
+    CreateConsole: (self: Tab, props: ConsoleProps) -> Console,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
+    CreateText: (self: Tab, props: TextProps) -> Text,
+    CreateDivider: (self: Tab, props: DividerProps?) -> Divider,
     CreateGroup: (self: Tab, props: GroupProps?) -> Group,
 }
 
 export type Window = {
     unloaded: boolean, -- true once Unload has run; the handle is spent
+    -- always-live view of every saved control, keyed by flag; reads give the current value,
+    -- writes route through the control's Set
+    Flags: { [string]: any },
     CreateTab: (self: Window, props: TabProps) -> Tab,
+    -- sidebar layout only; does nothing under the top strip
+    CreateSection: (self: Window, props: SectionProps) -> TabSection,
     CreateTag: (self: Window, props: TagProps) -> Tag,
     Notify: (self: Window, props: NotifyProps) -> (),
     Toast: (self: Window, props: ToastProps) -> (),
-    Popup: (self: Window, props: PopupProps) -> Popup,
+    Popup: (self: Window, props: PopupProps) -> Popup?, -- nil once the window is unloaded
     Show: (self: Window) -> (),
     Hide: (self: Window) -> (),
     ToggleHide: (self: Window) -> (),
@@ -309,6 +412,9 @@ export type Window = {
     Load: (self: Window, name: string?) -> boolean,
     ListConfigs: (self: Window) -> { string },
     DeleteConfig: (self: Window, name: string) -> boolean,
+    GetPath: (self: Window) -> (string, string),
+    Get: (self: Window, flag: string) -> any,
+    Set: (self: Window, flag: string, value: any) -> boolean,
     Unload: (self: Window) -> (),
 }
 

@@ -15,8 +15,10 @@ local locale = require(utility.locale)
 local log = require(utility.log)
 local hapticEngine = require(utility.HapticEngine)
 local windowSizing = require(utility.windowSizing)
+local layouts = require(utility.layouts)
 local chrome = require(script.Parent.chrome)
 local search = require(script.Parent.search)
+local sidebar = require(script.Parent.sidebar)
 
 -- Variables
 local variables = require(utility.variables)
@@ -32,9 +34,13 @@ Window.__index = Window
 local revealInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 -- The collapsed "pill" main morphs into on Hide, top-anchored the way the old standalone
--- restore button used to sit.
+-- restore button used to sit. showIconOnly trades the label for a round badge.
 local collapsedSize = UDim2.fromOffset(185, 50)
+local collapsedIconSize = UDim2.fromOffset(50, 50)
 local collapsedTop = UDim2.new(0.5, 0, 0, 20)
+local topToastOpenPosition = UDim2.new(0.5, 0, 0, 12)
+local topToastClosedPosition = UDim2.new(0.5, 0, 0, collapsedTop.Y.Offset + collapsedSize.Y.Offset + 12)
+local topToastMoveInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 -- Width of the top-centre toast stack container. Toasts hug their own content and centre
 -- within it, so this just needs to be at least the toast's own max width.
@@ -43,14 +49,46 @@ local maxToastWidth = 320
 -- Standard element row height, shared by the compact button/toggle scaffold.
 local compactRowHeight = 41
 
+-- A locked element just dims: light enough that you can still read what it was, heavy enough
+-- that it reads as out of reach. Nothing is laid over the top - a panel covering the row hides
+-- the very thing you are being told is locked. The reason goes in the description underneath,
+-- where there is nothing to compete with it.
+local lockScrimTransparency = 0.55
+local lockedDescriptionTransparency = 0.55
+
+-- How the tab selector arrives on first reveal: a quick ripple, capped so a long tab list
+-- doesn't turn the entrance into a queue.
+local tabStagger = 0.04
+local maxStaggeredTabs = 8
+
 -- How often the backstop re-checks the fit, for anything the viewport signal misses.
 local viewportReconcileInterval = 2
 
--- The size the current screen calls for. Everything downstream (the reveal target, drag
--- clamp, collapse) reads self.size, so it all inherits whatever this returns.
-local function fitWindowSize(): UDim2
+-- The size the current screen calls for, for this window's layout. Everything downstream (the
+-- reveal target, drag clamp, collapse) reads self.size, so it all inherits whatever this returns.
+local function fitWindowSize(mode): UDim2
     local camera = variables.workspace.CurrentCamera
-    return windowSizing.fit(camera and camera.ViewportSize)
+    return windowSizing.fit(camera and camera.ViewportSize, mode)
+end
+
+-- Per-corner radii are newer than the oldest clients Rayfield runs on, so a shape that only
+-- rounds some of its corners has to check before it asks. Everything still gets a radius on a
+-- client without them, just the same one on all four.
+local cornerNames = { "TopLeftRadius", "TopRightRadius", "BottomLeftRadius", "BottomRightRadius" }
+
+local perCornerSupported = (function()
+    return (
+        pcall(function()
+            local probe = Instance.new("UICorner")
+            probe.TopLeftRadius = UDim.new(0, 1)
+            probe:Destroy()
+        end)
+    )
+end)()
+
+-- Resolve the sidebarLayout property: tabs down the left instead of across the top.
+local function resolveLayout(value)
+    return if value then layouts.sidebar else layouts.top
 end
 
 -- Keys that drive a UIGradient and so want a ColorSequence. A dev may pass a plain Color3 for
@@ -73,6 +111,21 @@ end
 
 local function firstColor(value)
     return if typeof(value) == "ColorSequence" then value.Keypoints[1].Value else value
+end
+
+local function setTopToastPosition(window, animate)
+    local container = window._toastsTop
+    if not container then
+        return
+    end
+
+    local target = if window._collapsedShown then topToastClosedPosition else topToastOpenPosition
+    if not animate or container.Position == target then
+        container.Position = target
+        return
+    end
+
+    variables.tweenService:Create(container, topToastMoveInfo, { Position = target }):Play()
 end
 
 -- A subtle raised edge for a fill: lighten a dark fill, darken a light one.
@@ -169,20 +222,29 @@ function Window.new(properties)
         variables.setFallbackFont(fallbackFont)
     end
 
+    -- the layout decides the window's whole shape, so it has to settle before the first fit
+    local layout = resolveLayout(properties.sidebarLayout or properties.SidebarLayout)
+
     local self = setmetatable({
         name = properties.name or properties.Name or "Rayfield Window",
         subheading = properties.subtitle or properties.Subtitle,
-        size = fitWindowSize(),
+        layout = layout,
+        size = fitWindowSize(layout.mode),
         instances = {},
         connections = {},
 
         icon = properties.icon or properties.Icon,
         showName = properties.showName or properties.ShowName or "Rayfield",
         showIcon = properties.showIcon or properties.ShowIcon or constants.icons.rayfield,
+        -- collapse to a round badge rather than an icon-and-label pill
+        showIconOnly = properties.showIconOnly or properties.ShowIconOnly or false,
+        -- the line under the player's name in the sidebar's profile block
+        profileText = properties.profile or properties.Profile,
 
         themeProperties = {},
         localeProperties = {},
         tabs = {},
+        tabSections = {},
         tags = {},
         selectedTab = nil,
         theme = resolveTheme(properties.theme or properties.Theme),
@@ -230,6 +292,17 @@ function Window.new(properties)
             end
         end,
     })
+
+    -- Defaults before anything is built: the sidebar rail reads showProfile as it lays out, and
+    -- LoadSettings lands on top of these once the UI exists.
+    self.settings = {
+        toggleKeybind = Enum.KeyCode.K,
+        mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
+        keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
+        welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
+        haptics = true, -- buzzes on presses and notifications; silent where the device has none
+        showProfile = true, -- the player chip at the base of the sidebar rail
+    }
 
     -- Rayfield Gen2 Screen
     self.screenGui = self:Create("ScreenGui", {
@@ -279,13 +352,15 @@ function Window.new(properties)
         Parent = self.main,
     }, { Color = { "WindowColor", functions.toColorSequence } })
 
-    -- Bottom fade - gradient overlay so elements scroll out softly at the window's base
+    -- Bottom fade - gradient overlay so elements scroll out softly at the base of the content.
+    -- Sized and anchored to whatever the layout gives the content: the full window under top
+    -- tabs, the card alone beside a sidebar.
     self.bottomFade = self:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
-        AnchorPoint = Vector2.new(0, 1),
-        Position = UDim2.fromScale(0, 1),
-        Size = UDim2.new(1, 0, -0.093, 100),
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.fromScale(1, 1),
+        Size = self.layout.fadeSize,
         ZIndex = constants.zIndex.bottomFade,
 
         -- Animation
@@ -294,19 +369,12 @@ function Window.new(properties)
         Parent = self.main,
     })
 
-    self:Create("UICorner", {
-        Parent = self.bottomFade,
-    }, { CornerRadius = "CornerRoundness" })
+    self.bottomFadeCorner = self:_roundCorners(self.bottomFade, self.layout.fadeCorners)
 
     self.bottomFadeGradient = self:Create("UIGradient", {
         Rotation = 270,
         Offset = Vector2.new(0, 0.2),
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.4414, 0),
-            NumberSequenceKeypoint.new(0.7007, 0.631),
-            NumberSequenceKeypoint.new(1, 1),
-        }),
+        Transparency = self.layout.fadeTransparency,
 
         Parent = self.bottomFade,
     }, {
@@ -324,7 +392,7 @@ function Window.new(properties)
     self.topbar = self:Create("Frame", {
 
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 66),
+        Size = UDim2.new(1, 0, 0, self.layout.topbarHeight),
         -- Active so empty topbar space can catch input directly - tabs/actions/search sit on
         -- top and still get first pick, this is just the backdrop becoming a drag handle
         Active = true,
@@ -453,19 +521,45 @@ function Window.new(properties)
 
     -- Elements Preparation
 
+    -- Anchored bottom-right in both layouts: under top tabs it fills the width, beside a
+    -- sidebar it gives the rail its slice off the left and becomes a card in the corner.
     self.elements = self:Create("Frame", {
-        Size = UDim2.new(1, 0, 1, -106),
-        Position = UDim2.fromScale(0.5, 1),
-        AnchorPoint = Vector2.new(0.5, 1),
+        Size = UDim2.new(1, 0, 1, -self.layout.chromeHeight),
+        Position = UDim2.fromScale(1, 1),
+        AnchorPoint = Vector2.new(1, 1),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
         BackgroundTransparency = 1,
         ClipsDescendants = true,
 
         Parent = self.main,
     })
 
+    if self.layout.mode == "sidebar" then
+        self.elementsCorner = self:_roundCorners(self.elements, self.layout.cardCorners)
+
+        self.elementsStroke = self:Create("UIStroke", {
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+
+            -- Animation
+            Transparency = 1, -- In = 0
+
+            Parent = self.elements,
+        }, { Color = "SurfaceStroke" })
+
+        -- the rim is the gradient's job: a diagonal sweep that's brightest at the top-left
+        -- corner and gone by the bottom-right, where the window's own stroke already runs
+        self:Create("UIGradient", {
+            Rotation = self.layout.cardStrokeRotation,
+            Transparency = self.layout.cardStrokeTransparency,
+
+            Parent = self.elementsStroke,
+        })
+    end
+
     self.elementsLayout = self:Create("UIPageLayout", {
         Padding = UDim.new(0, 0),
-        FillDirection = Enum.FillDirection.Horizontal,
+        FillDirection = self.layout.pageDirection,
         VerticalAlignment = Enum.VerticalAlignment.Center,
         HorizontalAlignment = Enum.HorizontalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
@@ -482,40 +576,46 @@ function Window.new(properties)
         Parent = self.elements,
     })
 
-    -- Tabs Preparation
-    self.tabList = self:Create("ScrollingFrame", {
-        Name = "Tabs",
-        Active = true,
-        Size = UDim2.new(1, 0, 0, 38),
-        Position = UDim2.new(0.5, 0, 0, 65),
-        AnchorPoint = Vector2.new(0.5, 0),
+    -- Tabs Preparation. Either shape is `tabList` from here on, so nothing downstream has to
+    -- know which one it got.
+    if self.layout.mode == "sidebar" then
+        sidebar.build(self, self.layout)
+        sidebar.applyWidth(self, layouts.railWidthFor(self.layout, self.size.X.Offset))
+    else
+        self.tabList = self:Create("ScrollingFrame", {
+            Name = "Tabs",
+            Active = true,
+            Size = UDim2.new(1, 0, 0, self.layout.tabStripHeight),
+            Position = UDim2.new(0.5, 0, 0, self.layout.tabStripTop),
+            AnchorPoint = Vector2.new(0.5, 0),
 
-        BackgroundTransparency = 1,
-        AutomaticCanvasSize = Enum.AutomaticSize.X,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        ScrollBarThickness = 0,
-        ScrollBarImageTransparency = 1,
-        ScrollingDirection = Enum.ScrollingDirection.X,
+            BackgroundTransparency = 1,
+            AutomaticCanvasSize = Enum.AutomaticSize.X,
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            ScrollBarThickness = 0,
+            ScrollBarImageTransparency = 1,
+            ScrollingDirection = Enum.ScrollingDirection.X,
 
-        Parent = self.main,
-    })
+            Parent = self.main,
+        })
 
-    self.tabListLayout = self:Create("UIListLayout", {
-        Padding = UDim.new(0, 7),
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        HorizontalAlignment = Enum.HorizontalAlignment.Left,
-        SortOrder = Enum.SortOrder.LayoutOrder,
+        self.tabListLayout = self:Create("UIListLayout", {
+            Padding = UDim.new(0, 7),
+            FillDirection = Enum.FillDirection.Horizontal,
+            VerticalAlignment = Enum.VerticalAlignment.Center,
+            HorizontalAlignment = Enum.HorizontalAlignment.Left,
+            SortOrder = Enum.SortOrder.LayoutOrder,
 
-        Parent = self.tabList,
-    })
+            Parent = self.tabList,
+        })
 
-    self:Create("UIPadding", {
-        PaddingLeft = UDim.new(0, 22),
-        PaddingRight = UDim.new(0, 10),
+        self:Create("UIPadding", {
+            PaddingLeft = UDim.new(0, 22),
+            PaddingRight = UDim.new(0, 10),
 
-        Parent = self.tabList,
-    })
+            Parent = self.tabList,
+        })
+    end
 
     -- Actions
     self.actionContainer = self:Create("Frame", {
@@ -581,6 +681,8 @@ function Window.new(properties)
     })
 
     search.build(self)
+    -- the field is built after the rail, so hand it the width the rail actually settled on
+    self:_applyRailWidth()
 
     self.unloaded = false
     self.minimised = false
@@ -588,16 +690,14 @@ function Window.new(properties)
     self.animating = false
     self._revealing = false
     self.hasShownOnce = false
+    self._collapsedShown = false
 
-    self.settings = {
-        toggleKeybind = Enum.KeyCode.K,
-        mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
-        keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
-        welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
-        haptics = false, -- off by default; opt in from settings (buzzes on presses/notifications)
-    }
-
+    -- saved settings land after the rail was built against the defaults, so let it settle again
     self:LoadSettings()
+    if self.layout.mode == "sidebar" then
+        sidebar.reflowProfile(self)
+        sidebar.setSubtitle(self, self.profileText)
+    end
     hapticEngine.setContainer(self.screenGui) -- effects live with the interface, not the workspace
     hapticEngine.setEnabled(self.settings.haptics) -- honour a saved off before any interaction
     chrome.buildCollapsedFace(self)
@@ -706,6 +806,7 @@ function Window:_refreshElementThemes()
 end
 
 function Window:CreateTab(properties)
+    assert(not self.unloaded, "Cannot create a tab on an unloaded window.")
     local newTab = require(script.Parent.tab).new(self, properties)
 
     table.insert(self.tabs, newTab)
@@ -736,7 +837,39 @@ function Window:CreateTab(properties)
     return newTab
 end
 
+-- A heading in the sidebar rail. Same props as a tab's CreateSection, and it groups the tab
+-- rows created after it the way that one groups elements. Sidebar layout only.
+function Window:CreateSection(properties)
+    assert(not self.unloaded, "Cannot create a section on an unloaded window.")
+    local section = require(script.Parent.tabSection).new(self, properties)
+    table.insert(self.tabSections, section)
+
+    -- built after the window is already open: reveal it now, the same way a late tab reveals
+    -- its row rather than waiting for the next open
+    if not section.inert and not self.hidden and not self.minimised then
+        section:_setVisible(true)
+        section:_setShown(true, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
+    end
+
+    return section
+end
+
+-- Sections ride with the rows they label, so every path that fades or hides the rail's rows
+-- says the same thing to them.
+function Window:_setTabSectionsShown(shown, tweenInfo)
+    for _, section in self.tabSections do
+        section:_setShown(shown, tweenInfo)
+    end
+end
+
+function Window:_setTabSectionsVisible(visible)
+    for _, section in self.tabSections do
+        section:_setVisible(visible)
+    end
+end
+
 function Window:CreateTag(properties)
+    assert(not self.unloaded, "Cannot create a tag on an unloaded window.")
     local newTag = require(script.Parent.tag).new(self, properties)
     table.insert(self.tags, newTag)
     return newTag
@@ -862,8 +995,11 @@ function Window:Toast(properties)
         return
     end
 
-    local position = (properties or {}).position or "Top"
-    local isTop = position == "Top"
+    -- both casings and any case for the value, like every other toast property
+    properties = if typeof(properties) == "table" then properties else {}
+    local position = properties.position or properties.Position or "Top"
+    local isTop = typeof(position) ~= "string" or position:lower() ~= "bottom"
+    properties.position = if isTop then "Top" else "Bottom"
     local containerKey = if isTop then "_toastsTop" else "_toastsBottom"
     local container = self[containerKey]
 
@@ -871,7 +1007,7 @@ function Window:Toast(properties)
         container = self:Create("Frame", {
             Name = "Toasts",
             Size = UDim2.new(0, maxToastWidth, 1, -24),
-            Position = if isTop then UDim2.new(0.5, 0, 0, 12) else UDim2.new(0.5, 0, 1, -12),
+            Position = if isTop then topToastOpenPosition else UDim2.new(0.5, 0, 1, -12),
             AnchorPoint = if isTop then Vector2.new(0.5, 0) else Vector2.new(0.5, 1),
             BackgroundTransparency = 1,
             ZIndex = constants.zIndex.toast,
@@ -891,6 +1027,12 @@ function Window:Toast(properties)
         })
 
         self[containerKey] = container
+
+        -- the pill may already hold the top slot, so let the one rule place it rather than
+        -- restating it here. nothing's been on screen yet, so there's nothing to move
+        if isTop then
+            setTopToastPosition(self, false)
+        end
     end
 
     return require(script.Parent.toast).new(self, properties, container)
@@ -917,6 +1059,12 @@ function Window:Hide()
     -- stays hidden here since the collapse hides it anyway; Show re-enables it.
     if self._searching then
         search.close(self, { showTabs = false, jumpTo = self.selectedTab and self.selectedTab.tabPage })
+    end
+
+    -- a keybind left recording would capture the next keypress against an invisible UI and
+    -- eat the toggle key
+    if self._recordingKeybind then
+        self._recordingKeybind:_stopRecording()
     end
 
     self.animating = true
@@ -958,8 +1106,7 @@ function Window:Hide()
 
     -- fade the window's own chrome out; main keeps its own background/gradient/corner the
     -- whole time, it just reshapes underneath - there's nothing to hand off to
-    variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
-    variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
+    self:_fadeSurfaces(false, fadeInfo)
 
     if self.title then
         variables.tweenService:Create(self.title, fadeInfo, { TextTransparency = 1 }):Play()
@@ -986,12 +1133,29 @@ function Window:Hide()
             tab:_applyVisual("hidden", fadeInfo)
         end
     end
+    self:_setTabSectionsShown(false, fadeInfo)
 
     self:_fadeSelectedElementsOut()
 
     -- collapse into the pill in one continuous move - size and position tweened together
     -- so they stay perfectly in sync throughout
-    variables.tweenService:Create(self.main, moveInfo, { Size = size, Position = home }):Play()
+    local collapse = variables.tweenService:Create(self.main, moveInfo, { Size = size, Position = home })
+    collapse.Completed:Connect(function()
+        -- any end to the collapse settles it, cancelled included. a tween that stops early
+        -- still has to hand input back, or the pill sits dead and Show can never run again
+        if self.unloaded or not self.hidden then
+            return
+        end
+
+        -- The pill now occupies the top-centre slot. Move the stack only when the frame says
+        -- the collapse is complete, so this cannot drift from the animation that creates it.
+        self._collapsedShown = true
+        setTopToastPosition(self, true)
+        self.collapsedInteract.Visible = true
+        self.animating = false
+        self._revealing = false
+    end)
+    collapse:Play()
     variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = UDim.new(1, 0) }):Play()
 
     -- once the chrome's faded, drop it and the scrolling content so nothing squashes/pokes
@@ -1001,20 +1165,9 @@ function Window:Hide()
             return
         end
         self.topbar.Visible = false
-        self.elements.Visible = false
-        self.tabList.Visible = false
+        self:_setContentVisible(false)
 
         chrome.setCollapsedShown(self, true, faceInfo)
-    end)
-
-    -- once the move's settled the pill is done morphing: hand clicks to it
-    task.delay(0.35, function()
-        if not self.hidden then
-            return
-        end
-        self.collapsedInteract.Visible = true
-        self.animating = false
-        self._revealing = false
     end)
 end
 
@@ -1049,8 +1202,7 @@ function Window:ToggleMinimise()
         image.assign(self.minimiseAction.iconLabel, "Image", constants.icons.minimise) -- back to the minimise icon
 
         variables.tweenService:Create(self.main, sizeInfo, { Size = self.size }):Play()
-        variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
-        variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
+        self:_fadeSurfaces(true, fadeInfo)
 
         variables.tweenService
             :Create(self.drag.drag, sizeInfo, {
@@ -1069,8 +1221,7 @@ function Window:ToggleMinimise()
             if self.minimised or self.hidden then
                 return -- re-minimised or hidden mid animation
             end
-            self.elements.Visible = true
-            self.tabList.Visible = true
+            self:_setContentVisible(true)
 
             for _, tab in pairs(self.tabs) do
                 if not tab.neglectSelector and tab.topbarItem then
@@ -1078,6 +1229,8 @@ function Window:ToggleMinimise()
                     tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
                 end
             end
+            self:_setTabSectionsVisible(true)
+            self:_setTabSectionsShown(true, fadeInfo)
 
             self:_revealElements(0.035, 0.4)
         end)
@@ -1097,23 +1250,25 @@ function Window:ToggleMinimise()
                 tab:_applyVisual("hidden", fadeInfo)
             end
         end
+        self:_setTabSectionsShown(false, fadeInfo)
 
         task.delay(0.3, function()
             if not self.minimised then
                 return -- restored mid animation
             end
-            self.elements.Visible = false
-            self.tabList.Visible = false
+            self:_setContentVisible(false)
             for _, tab in pairs(self.tabs) do
                 if not tab.neglectSelector and tab.topbarItem then
                     tab.topbarItem.Visible = false
                 end
             end
+            self:_setTabSectionsVisible(false)
         end)
 
-        variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
-        variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
-        variables.tweenService:Create(self.main, sizeInfo, { Size = UDim2.fromOffset(self.size.X.Offset, 66) }):Play()
+        self:_fadeSurfaces(false, fadeInfo)
+        variables.tweenService
+            :Create(self.main, sizeInfo, { Size = UDim2.fromOffset(self.size.X.Offset, self.layout.topbarHeight) })
+            :Play()
 
         variables.tweenService
             :Create(self.drag.drag, sizeInfo, {
@@ -1121,7 +1276,7 @@ function Window:ToggleMinimise()
                     self.main.Position.X.Scale,
                     self.main.Position.X.Offset,
                     self.main.Position.Y.Scale,
-                    self.main.Position.Y.Offset + 66 / 2 + 15
+                    self.main.Position.Y.Offset + self.layout.topbarHeight / 2 + 15
                 ),
             })
             :Play()
@@ -1182,9 +1337,13 @@ function Window:_applyWindowSize()
         return
     end
 
-    local size = fitWindowSize()
+    local size = fitWindowSize(self.layout.mode)
     local changed = size ~= self.size
     self.size = size
+
+    -- the rail is sized off main, so setting it now is right whether main resizes on the spot
+    -- below or grows into the banked size on its next show
+    self:_applyRailWidth()
 
     -- a window mid-animation is already tweening toward the old size, so bank the change and
     -- let the reconcile apply it once the tween is done rather than fighting it
@@ -1201,6 +1360,15 @@ function Window:_applyWindowSize()
     self.main.Size = size
     self:_clampToScreen()
     self:_syncDragBar()
+end
+
+-- The rail keeps its labels while there's width to spare and drops to icons when there isn't,
+-- so the content card never pays for them. No-op outside the sidebar layout.
+function Window:_applyRailWidth()
+    if self.layout.mode ~= "sidebar" then
+        return
+    end
+    sidebar.applyWidth(self, layouts.railWidthFor(self.layout, self.size.X.Offset))
 end
 
 -- Follow the screen. The property signal is the fast path, but CurrentCamera gets swapped
@@ -1460,6 +1628,20 @@ function Window:_buildSettingsUI()
 
     self.rfSettings:CreateSection({ name = "Window" })
 
+    -- only the sidebar layout has somewhere to put a profile, so only it offers the switch
+    if self.layout.mode == "sidebar" and self.profile then
+        self.rfSettings:CreateToggle({
+            name = "Show profile",
+            description = "Shows your avatar and name at the base of the sidebar. Turn it off to keep "
+                .. "them out of a stream or a screenshot.",
+            value = self.settings.showProfile,
+            callback = function(state)
+                sidebar.setProfileEnabled(self, state)
+                self:SaveSettings()
+            end,
+        })
+    end
+
     self.rfSettings:CreateToggle({
         name = "Keep window on screen",
         description = "Stops the window being dragged off the edge of the screen and lost.",
@@ -1586,12 +1768,169 @@ function Window:_buildSettingsUI()
     end
 end
 
+-- The line under the player's name in the sidebar's profile block ("Premium", a rank, a tier).
+-- Pass nil or "" to drop it and leave the name on its own. No-op in the top-tab layout, which
+-- has no profile block to put it in.
+function Window:SetProfile(text)
+    self.profileText = text
+    sidebar.setSubtitle(self, text)
+end
+
 function Window:SaveSettings()
     return persistence.saveSettings(self)
 end
 
 function Window:LoadSettings()
     return persistence.loadSettings(self)
+end
+
+-- Round a shape's corners to the theme's radius. `corners` names the ones that take it and
+-- squares the rest; omit it and the whole shape is rounded, which is the single themed radius
+-- the top layout has always used.
+function Window:_roundCorners(parent, corners)
+    if not corners or not perCornerSupported then
+        return self:Create("UICorner", {
+            Parent = parent,
+        }, { CornerRadius = "CornerRoundness" })
+    end
+
+    local properties = { Parent = parent }
+    local themed = {}
+    for _, name in cornerNames do
+        properties[name] = UDim.new(0, 0)
+    end
+    for _, name in corners do
+        properties[name] = nil -- the theme sets this one, so dont square it first
+        themed[name] = "CornerRoundness"
+    end
+
+    return self:Create("UICorner", properties, themed)
+end
+
+-- Lock or unlock one element. It dims, it stops taking input, and its callback wont fire (see
+-- _runGuarded). `reason` replaces the element's description while it's locked, so the UI can
+-- say why without covering the element up to do it.
+function Window:_setElementLocked(element, locked, reason)
+    locked = locked == true
+    -- locked starts out nil, so compare against a real boolean: `nil == false` is false, and
+    -- Unlock on an element that was never locked would otherwise build a scrim just to fade it
+    -- straight back out. A fresh reason on an already-locked element is still worth applying.
+    local wasLocked = element.locked == true
+    if wasLocked == locked and not (locked and reason) then
+        return
+    end
+    element.locked = locked
+
+    if not element.lockScrim then
+        self:_buildLockScrim(element)
+    end
+
+    local info = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+    if locked then
+        element.lockScrim.Visible = true
+    end
+    variables.tweenService
+        :Create(element.lockScrim, info, {
+            BackgroundTransparency = if locked then lockScrimTransparency else 1,
+        })
+        :Play()
+    if not locked then
+        task.delay(info.Time, function()
+            if not element.locked and element.lockScrim then
+                element.lockScrim.Visible = false -- out of hit-testing once it has faded
+            end
+        end)
+    end
+
+    -- say why in the description, and put the element's own back when it unlocks
+    local descriptor = element.descriptor
+    if not descriptor then
+        return
+    end
+
+    if locked then
+        -- `or`, not plain assignment: re-locking with a new reason must not remember the old
+        -- reason as though it were the element's own description
+        element._descriptionBefore = element._descriptionBefore or descriptor.titleLabel.Text
+        descriptor.titleLabel.Text = locale.resolve(reason or "This element is locked.")
+    elseif element._descriptionBefore then
+        descriptor.titleLabel.Text = element._descriptionBefore
+        element._descriptionBefore = nil
+    end
+
+    variables.tweenService
+        :Create(descriptor.titleLabel, info, {
+            TextTransparency = if locked then lockedDescriptionTransparency else 0.7,
+        })
+        :Play()
+end
+
+-- The scrim: a sheet of the window's own colour over the element, dimming it. It carries
+-- nothing itself - it's the dimming and the description that say what's happened. It is an
+-- Active button, so it swallows anything aimed at the element underneath rather than leaving
+-- each element to check a flag on every input path.
+function Window:_buildLockScrim(element)
+    element.lockScrim = self:Create("TextButton", {
+        Name = "ElementLock",
+        Active = true,
+        AutoButtonColor = false,
+        Size = UDim2.fromScale(1, 1),
+        BorderSizePixel = 0,
+        Text = "",
+        TextTransparency = 1,
+        ZIndex = constants.zIndex.elementLock,
+        Visible = false,
+
+        -- no literal BackgroundColor3 here: Create applies the theme first and plain properties
+        -- second, so setting it both ways would paint straight over the themed colour
+        BackgroundTransparency = 1, -- In = lockScrimTransparency
+
+        Parent = element.main,
+    }, { BackgroundColor3 = { "WindowColor", firstColor } })
+
+    self:Create("UICorner", {
+        Parent = element.lockScrim,
+    }, { CornerRadius = "ElementCornerRadius" })
+end
+
+-- Show or hide everything below the topbar in one go: the content area and the tab selector,
+-- whichever shape it is. Kept together so a collapse can never leave a rail floating over a pill.
+function Window:_setContentVisible(visible)
+    self.elements.Visible = visible
+    self.tabList.Visible = visible
+    if self.sidebar then
+        self.sidebar.Visible = visible
+    end
+end
+
+-- The window's own surfaces: shadow, rim, the fade over the content, and (sidebar) the content
+-- card and the profile chip. These come and go together every time the window opens or collapses.
+function Window:_fadeSurfaces(shown, fadeInfo)
+    local targets = {
+        [self.windowShadow] = { Transparency = if shown then 0.6 else 1 },
+        [self.windowStroke] = { Transparency = if shown then 0.95 else 1 },
+        [self.bottomFade] = { BackgroundTransparency = if shown then 0 else 1 },
+    }
+
+    if self.elementsStroke then
+        targets[self.elements] = {
+            BackgroundTransparency = if shown then self.layout.cardTransparency else 1,
+        }
+        targets[self.elementsStroke] = { Transparency = if shown then 0 else 1 }
+    end
+
+    for instance, properties in targets do
+        if fadeInfo then
+            variables.tweenService:Create(instance, fadeInfo, properties):Play()
+        else
+            for property, value in properties do
+                instance[property] = value
+            end
+        end
+    end
+
+    sidebar.setProfileShown(self, shown, fadeInfo)
 end
 
 -- Fade the open tab's elements out - the only ones actually on screen, since the page
@@ -1701,18 +2040,27 @@ function Window:_quickRestore()
     -- fades off, main grows + un-rounds. No chrome, no content - so you never see the topbar,
     -- tabs or bottom fade floating over a frame that isn't a window yet.
     chrome.setCollapsedShown(self, false, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
-    variables.tweenService:Create(self.main, growInfo, { Size = self.size, Position = target }):Play()
+    local restore = variables.tweenService:Create(self.main, growInfo, { Size = self.size, Position = target })
+    restore.Completed:Connect(function()
+        if self.hidden or self.unloaded then
+            return
+        end
+
+        -- The restored frame has cleared the pill's slot. Its own completion is the single
+        -- clock for moving the toast stack back, regardless of how this motion is implemented.
+        self._collapsedShown = false
+        setTopToastPosition(self, true)
+    end)
+    restore:Play()
     variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = self.theme.CornerRoundness }):Play()
 
     -- Phase 2: once the frame actually reads as a window, fade its chrome in and stagger the
     -- open tab's elements. Other tabs snap ready off-screen - nobody's looking, so no animation.
     task.delay(0.22, function()
         self.topbar.Visible = true
-        self.tabList.Visible = true
-        self.elements.Visible = true
+        self:_setContentVisible(true)
 
-        variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
-        variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
+        self:_fadeSurfaces(true, fadeInfo)
 
         if self.topbarIcon then
             variables.tweenService:Create(self.topbarIcon, fadeInfo, { ImageTransparency = 0 }):Play()
@@ -1746,6 +2094,8 @@ function Window:_quickRestore()
                 tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
             end
         end
+        self:_setTabSectionsVisible(true)
+        self:_setTabSectionsShown(true, fadeInfo)
 
         self:_revealElements(0.035, 0.4)
     end)
@@ -1772,8 +2122,7 @@ end
 
 function Window:_firstShow()
     -- Intro animation
-    self.elements.Visible = true
-    self.tabList.Visible = true
+    self:_setContentVisible(true)
 
     self.drag.drag.Visible = false
     self.main.Visible = true
@@ -1785,20 +2134,7 @@ function Window:_firstShow()
         )
         :Play()
     task.wait(0.85) -- let the frame actually read as a window before anything shows on top of it
-    variables.tweenService
-        :Create(
-            self.windowShadow,
-            TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-            { Transparency = 0.6 }
-        )
-        :Play()
-    variables.tweenService
-        :Create(
-            self.bottomFade,
-            TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-            { BackgroundTransparency = 0 }
-        )
-        :Play()
+    self:_fadeSurfaces(true, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out))
     task.wait(0.3)
 
     if self.icon then
@@ -1849,17 +2185,27 @@ function Window:_firstShow()
 
     task.wait(0.2)
 
+    -- Stagger the selector in, but on a budget: past a handful of tabs the rest arrive
+    -- together rather than making a long list crawl in one at a time.
     task.spawn(function()
+        local info = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+        -- headings arrive together, ahead of the stagger: a row shouldn't land under a
+        -- heading that hasn't turned up yet
+        self:_setTabSectionsVisible(true)
+        self:_setTabSectionsShown(true, info)
+
+        local staggered = 0
         for _, tab in pairs(self.tabs) do
             if not tab.neglectSelector then
                 tab.topbarItem.Visible = true
-                tab:_applyVisual(
-                    if self.selectedTab == tab then "selected" else "unselected",
-                    TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-                )
+                tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", info)
                 tab:_spinGradients()
 
-                task.wait(0.15)
+                staggered += 1
+                if staggered <= maxStaggeredTabs then
+                    task.wait(tabStagger)
+                end
             end
         end
     end)
@@ -1868,6 +2214,9 @@ function Window:_firstShow()
 
     task.wait(1)
 
+    -- the fit can change between construction and now (a late camera banks a new size), so
+    -- re-derive the bar's spot rather than trusting the construction-time position
+    self:_syncDragBar()
     self.drag.drag.Visible = true
     variables.tweenService
         :Create(
@@ -1928,6 +2277,10 @@ function Window:_applyNamedConfig(name)
     if not self:Load(name) then
         return false
     end
+    -- promotion means the default file becomes this config, unbuilt elements included; repoint
+    -- the carry-forward so Save doesnt drop flags for elements that havent registered yet
+    local _, defaultPath = persistence.getPath(self)
+    self._loadedConfigPath = defaultPath
     self:Save()
     return true
 end
@@ -2156,7 +2509,7 @@ function Window:_wireElementHover(element)
     local info = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local theme = self.theme
 
-    self:Connect(element.main.MouseEnter, function()
+    self:ConnectFor(element, element.main.MouseEnter, function()
         if not self:_interactive() then
             return -- window still revealing/hiding: dont light up mid-animation
         end
@@ -2173,7 +2526,7 @@ function Window:_wireElementHover(element)
         end
     end)
 
-    self:Connect(element.main.MouseLeave, function()
+    self:ConnectFor(element, element.main.MouseLeave, function()
         variables.tweenService
             :Create(
                 element.stroke,
@@ -2192,6 +2545,12 @@ end
 -- slider firing every frame flashes once. shared by every interactive element. elements whose
 -- `main` is a transparent wrapper (the dropdown) set `flashTarget` to the frame to tint.
 function Window:_runGuarded(element, fn, ...)
+    -- a locked element fires nothing. This is the one place every element's callback goes
+    -- through, so locking here is what makes the lock real rather than cosmetic.
+    if element.locked then
+        return
+    end
+
     local args = table.pack(...)
     task.spawn(function()
         local ok, err = pcall(function()
@@ -2388,7 +2747,11 @@ end
 -- restore pill used to sit at, translated into main's own centre-anchored space (main never
 -- changes AnchorPoint, so its Position always addresses its centre, not its top edge).
 function Window:_collapsedRect()
-    local size = collapsedSize
+    local size = if self.showIconOnly then collapsedIconSize else collapsedSize
+    -- a pill that's been dragged stays where it was put, rather than snapping back to the top
+    if self._collapsedPosition then
+        return self._collapsedPosition, size
+    end
     local home = UDim2.new(
         collapsedTop.X.Scale,
         collapsedTop.X.Offset,
@@ -2463,6 +2826,79 @@ function Window:DestroySubtree(root)
     end
 
     root:Destroy()
+end
+
+-- Drop a batch of connections in one go. Disconnect does a linear scan and a shift per
+-- connection, which is fine for one and quadratic for a thousand; this filters each list once.
+-- `owner` is the element that also tracked them, if any.
+function Window:DisconnectMany(owner, connections)
+    if not connections or #connections == 0 then
+        return
+    end
+
+    local dropping = {}
+    for _, connection in connections do
+        dropping[connection] = true
+        connection:Disconnect()
+    end
+
+    local function filter(list)
+        if not list then
+            return
+        end
+        local kept = 0
+        for index = 1, #list do
+            local entry = list[index]
+            if not dropping[entry] then
+                kept += 1
+                list[kept] = entry
+            end
+        end
+        for index = #list, kept + 1, -1 do
+            list[index] = nil
+        end
+    end
+
+    filter(self.connections)
+    if owner and owner ~= self then
+        filter(owner.connections)
+    end
+end
+
+-- DestroySubtree for a batch. One walk of the tracked instances for the whole set rather than
+-- one per subtree - tearing down a long list was otherwise re-walking every instance in the
+-- window for every row it dropped.
+function Window:DestroySubtrees(roots)
+    if not roots or #roots == 0 then
+        return
+    end
+
+    local inSubtree = {}
+    for _, root in roots do
+        inSubtree[root] = true
+        for _, descendant in root:GetDescendants() do
+            inSubtree[descendant] = true
+        end
+    end
+
+    local kept = 0
+    for index = 1, #self.instances do
+        local instance = self.instances[index]
+        if inSubtree[instance] then
+            self.themeProperties[instance] = nil
+            self.localeProperties[instance] = nil
+        else
+            kept += 1
+            self.instances[kept] = instance
+        end
+    end
+    for index = #self.instances, kept + 1, -1 do
+        self.instances[index] = nil
+    end
+
+    for _, root in roots do
+        root:Destroy()
+    end
 end
 
 function Window:Unload()

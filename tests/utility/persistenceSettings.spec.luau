@@ -167,6 +167,32 @@ return function()
             expect(window.settings.haptics).to.equal(false)
         end)
 
+        -- a settings file written before a key existed must not be treated as an opt-out:
+        -- the key is simply absent, so the current default stands
+        it("leaves a setting the file predates at its default", function()
+            local window = makeWindow()
+            window.settings.haptics = true
+            window.settings.showProfile = true
+            files["Root/Settings/rayfield.rfld"] = "settings-json"
+            decodedData = { mouseOverride = true } -- an older file, before these keys existed
+
+            expect(persistenceSettings.loadSettings(window)).to.equal(true)
+            expect(window.settings.mouseOverride).to.equal(true)
+            expect(window.settings.haptics).to.equal(true)
+            expect(window.settings.showProfile).to.equal(true)
+        end)
+
+        -- and the other way: a saved false is a real choice and survives a default flip
+        it("keeps a saved opt-out even when the default has since changed", function()
+            local window = makeWindow()
+            window.settings.haptics = true -- the current default
+            files["Root/Settings/rayfield.rfld"] = "settings-json"
+            decodedData = { haptics = false }
+
+            expect(persistenceSettings.loadSettings(window)).to.equal(true)
+            expect(window.settings.haptics).to.equal(false)
+        end)
+
         it("ignores non-boolean persisted settings", function()
             local window = makeWindow()
             files["Root/Settings/rayfield.rfld"] = "settings-json"

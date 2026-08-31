@@ -69,13 +69,24 @@ local backdropShown = 0.5 -- how dark the dim gets
 -- never runs Close, so entries are pruned by liveness rather than trusted to remove themselves.
 local stack = {}
 
-local function topmost(popup)
+-- The Escape press that just closed a popup. Every open popup listens to the same InputBegan
+-- and closing the top one synchronously makes the next one topmost, so without this a single
+-- press would fall through the whole stack.
+local consumedEscape = nil
+
+-- Drop entries whose popup is gone. A popup torn down with its window never runs Close, so
+-- liveness is the only thing that can be trusted here.
+local function pruneStack()
     for index = #stack, 1, -1 do
         local open = stack[index]
         if open._closed or not open.screenGui.Parent then
             table.remove(stack, index)
         end
     end
+end
+
+local function topmost(popup)
+    pruneStack()
     return stack[#stack] == popup
 end
 
@@ -106,6 +117,9 @@ function Popup.new(window, properties)
     end
 
     self:_build()
+    -- prune on the way in as well as on Escape: a window unloaded with popups open leaves
+    -- dead entries behind, and nothing else would clear them until the next Escape
+    pruneStack()
     table.insert(stack, self) -- built, so it has a screenGui for the liveness prune
 
     task.spawn(function()
@@ -245,6 +259,10 @@ function Popup:_build()
             self._connections,
             window:Connect(variables.userInputService.InputBegan, function(input, processed)
                 if not processed and input.KeyCode == Enum.KeyCode.Escape and topmost(self) then
+                    if input == consumedEscape then
+                        return
+                    end
+                    consumedEscape = input
                     self:Close()
                 end
             end)

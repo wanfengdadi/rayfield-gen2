@@ -17,6 +17,7 @@
 # Generated tooling defs (created in CI / locally on demand)
 /roblox.yml
 /globalTypes.d.luau
+/globalTypes.d.luau.ref
 
 # Private preview access map
 /preview-tokens.md
@@ -24,3 +25,6 @@
 # Claude and Artificial Intelligence
 CLAUDE.md
 .claude/
+
+# Wrangler local state
+worker/.wrangler/

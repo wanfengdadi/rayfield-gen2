@@ -58,6 +58,9 @@ constants.statAccents = {
 
 -- Named stacking layers for window furniture (assumes Global ZIndexBehavior)
 constants.zIndex = {
+    -- over an element's own content, so a locked element cant be reached through it
+    elementLock = 60,
+    elementLockContent = 65,
     bottomFade = 100,
     -- bottom-right notification cards, above the bottom fade + drag so they aren't dimmed or
     -- pierced by them (they land over the window's lower-right corner)

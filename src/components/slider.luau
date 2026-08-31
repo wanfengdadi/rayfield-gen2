@@ -17,15 +17,21 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
+local lockable = require(utility.lockable)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 
 -- Decimal places implied by an increment (0.1 -> 1, 0.25 -> 2, 1 -> 0). Used so
 -- the readout formats mid-roll floats to the same precision as landed values.
+-- Checks against the nearest whole number at each scale so float error can't
+-- inflate the count (0.07 * 10 is 0.7000000000000001, still 2 decimals).
 local function decimalsOf(step)
     local decimals = 0
-    while step % 1 ~= 0 and decimals < 6 do
-        step = step * 10
+    while decimals < 6 do
+        local scaled = step * 10 ^ decimals
+        if math.abs(scaled - math.round(scaled)) < 1e-9 then
+            break
+        end
         decimals += 1
     end
     return decimals
@@ -49,6 +55,48 @@ local followInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirecti
 -- so those two cases land cleanly on either side and open/close transients never straddle it.
 local narrowWidth = 300
 
+-- The pill's two sizes: at rest, and while it's held. Where the pill sits depends on how wide it
+-- currently is, so the sizes live next to the geometry that reads them.
+local handleRest = Vector2.new(35, 20)
+local handleHeld = Vector2.new(41, 22)
+
+-- Where the fill ends, and where the pill sits on the end of it.
+--
+-- The fill used to run to a plain fraction of the track with the pill hanging off its edge by a
+-- fixed amount. That puts the pill outside the track at both ends: past the end at the top of the
+-- range, and before the start at the bottom, where the fill has no width at all. A full-width
+-- slider has enough margin either side to hide it. A grid column does not, and the pill draws over
+-- the card beside it.
+--
+-- Both are inset by the pill instead, and by half of it where the fill is concerned. At the top of
+-- the range the fill is the whole track, so the bar reads as full with the pill on the end of it.
+-- At the bottom the fill reaches the middle of the pill, so the pill has green behind its left half
+-- and nothing pokes out beside it. The pill lands inside the track at both ends, which is the point.
+--
+-- How far the two of them reach past the fill's fraction of the track: the whole pill at the bottom
+-- of the range, none of it at the top. Whole pixels, because a UDim offset is, and they split this
+-- one number between them rather than each halving the pill on its own - rounded apart they'd land
+-- a pixel out and hang the pill over the end after all.
+-- The pill's centre rides the fill's edge and maps straight onto the track, so at either end
+-- half of it hangs past the track the way the design has it. Scale rather than pixels: the fill
+-- and the pill read the same ratio, so they can't round apart and drift by a pixel.
+local function fillSize(ratio: number): UDim2
+    return UDim2.new(ratio, 0, 1, 0)
+end
+
+-- The pill sits centred on the fill's leading edge, and it lives inside the fill, so it tracks
+-- the value without a position of its own: the fill resizes and carries it. Centred means half
+-- of it is past the fill, which at either end of the range is half a pill past the track.
+local function handleOffset(): UDim2
+    return UDim2.new(1, 0, 0.5, 0)
+end
+
+-- The pointer maps over the whole track, because the pill's centre does too. Clamping covers
+-- the ends, where half the pill sits past the track.
+local function ratioFromPointer(x: number, left: number, travel: number): number
+    return math.clamp((x - left) / travel, 0, 1)
+end
+
 function Slider.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -68,7 +116,16 @@ function Slider.new(tab, properties)
 
         dragging = false,
         minimal = properties.minimal or properties.Minimal or false, -- track only, no name/value
+
+        -- Where the pill is headed, which is where it already sits outside a drag
+        _handleWidth = handleRest.X,
     }, Slider)
+
+    -- catch a malformed range up front, before the clamp/snap math throws something cryptic
+    assert(
+        typeof(self.range) == "table" and typeof(self.range[1]) == "number" and typeof(self.range[2]) == "number",
+        "A slider range needs two numbers, like { 0, 100 }."
+    )
 
     -- keep range ascending and increment positive so the clamp/snap math stays sane
     if self.range[1] > self.range[2] then
@@ -166,9 +223,9 @@ function Slider.new(tab, properties)
 
     -- Handle blob: solid white at rest, ghosts + grows a stroke while held
     self.handle = self.window:Create("Frame", {
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, 20, 0.5, 0),
-        Size = UDim2.fromOffset(35, 20),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = handleOffset(), -- rides the fill's edge, see fillSize
+        Size = UDim2.fromOffset(handleRest.X, handleRest.Y),
         BorderSizePixel = 0,
         ZIndex = 50,
         BackgroundTransparency = 1, -- In = 0
@@ -250,19 +307,17 @@ function Slider.new(tab, properties)
 
     self.window:ConnectFor(self, variables.userInputService.InputEnded, function(input)
         if
-            (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
-            and self.dragging
+            input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
         then
-            self.dragging = false
-            self:_setHeld(false)
-
-            if self._dragConnection then
-                self._dragConnection:Disconnect()
-                self._dragConnection = nil
-            end
-
-            self.window:_persist(self)
+            self:_endDrag()
         end
+    end)
+
+    -- releasing the button outside the Roblox window never fires InputEnded, so treat
+    -- losing focus as letting go too - otherwise the slider sticks to the cursor forever
+    self.window:ConnectFor(self, variables.userInputService.WindowFocusReleased, function()
+        self:_endDrag()
     end)
 
     if self.description and not self.minimal then
@@ -473,10 +528,23 @@ function Slider:_format(value)
     return text
 end
 
+-- The one place the track's width and the pill's are read together: how far the pill insets the
+-- fill and the pointer, and the room its centre has left to travel. The fill, the pill and the
+-- pointer mapping all take these, so they can't come to different answers about the same two
+-- numbers. A track too narrow to hold the pill has no travel to give, and neither has one that
+-- hasn't been laid out yet - _updateFromMouse turns both away below rather than map onto nothing,
+-- which is why neither the fill, the pill nor the pointer needs a guard of its own.
+--
+-- Travel is the whole track: the pill's centre reaches both ends and half of it hangs past.
+function Slider:_pillTravel()
+    return math.max(self.track.AbsoluteSize.X, 0)
+end
+
 function Slider:_renderProgress(info)
     local span = self.range[2] - self.range[1]
     local ratio = if span ~= 0 then math.clamp((self.value - self.range[1]) / span, 0, 1) else 0
-    local size = UDim2.fromScale(ratio, 1)
+
+    local size = fillSize(ratio)
     if info then
         variables.tweenService:Create(self.progress, info, { Size = size }):Play()
     else
@@ -485,13 +553,13 @@ function Slider:_renderProgress(info)
 end
 
 function Slider:_updateFromMouse()
-    local width = self.track.AbsoluteSize.X
-    if width <= 0 then
+    local travel = self:_pillTravel()
+    if travel <= 0 then
         return
     end
 
     local ratio =
-        math.clamp((variables.userInputService:GetMouseLocation().X - self.track.AbsolutePosition.X) / width, 0, 1)
+        ratioFromPointer(variables.userInputService:GetMouseLocation().X, self.track.AbsolutePosition.X, travel)
     local value = snapTo(self.range, self.increment, self.range[1] + ratio * (self.range[2] - self.range[1]))
 
     if value ~= self.value then
@@ -505,23 +573,54 @@ function Slider:_updateFromMouse()
     end
 end
 
-function Slider:_setHeld(held)
-    if held then
-        variables.tweenService
-            :Create(self.handle, heldInfo, { Size = UDim2.fromOffset(41, 22), BackgroundTransparency = 0.7 })
-            :Play()
-        variables.tweenService:Create(self.handleStroke, heldInfo, { Transparency = 0.6 }):Play()
-    else
-        variables.tweenService
-            :Create(self.handle, heldInfo, { Size = UDim2.fromOffset(35, 20), BackgroundTransparency = 0 })
-            :Play()
-        variables.tweenService:Create(self.handleStroke, heldInfo, { Transparency = 1 }):Play()
+-- shared release path: InputEnded and window focus loss both land here
+function Slider:_endDrag()
+    if not self.dragging then
+        return
     end
+    self.dragging = false
+    self:_setHeld(false)
+
+    if self._dragConnection then
+        self._dragConnection:Disconnect()
+        self._dragConnection = nil
+    end
+
+    self.window:_persist(self)
 end
 
--- pcall + debounced error-flash via Window:_runGuarded (fires every drag frame)
+-- Two tweens run over the pill during a drag: this one growing it, and the one _renderProgress
+-- starts to follow the value. Roblox cancels an earlier tween when a later one takes the same
+-- property, so if both wrote Position the first drag update would kill the grow halfway and leave
+-- the pill at an in-between size. They're split by property instead: the held state owns Size and
+-- the transparencies, _renderProgress owns Position and the fill. Handing the move over here keeps
+-- that true while still putting the pill where its new width wants it.
+function Slider:_setHeld(held)
+    -- the press already fires with dragging true (the flag is set before the value lands), so
+    -- only the release needs a call of its own: it's the one that says the gesture is over.
+    -- _endDrag guards on self.dragging, so this can only follow a real drag.
+    if not held then
+        self:_fireCallback(self.value)
+    end
+
+    local target = if held then handleHeld else handleRest
+    self._handleWidth = target.X
+
+    variables.tweenService
+        :Create(self.handle, heldInfo, {
+            Size = UDim2.fromOffset(target.X, target.Y),
+            BackgroundTransparency = if held then 0.7 else 0,
+        })
+        :Play()
+    variables.tweenService:Create(self.handleStroke, heldInfo, { Transparency = if held then 0.6 else 1 }):Play()
+    self:_renderProgress(heldInfo)
+end
+
+-- pcall + debounced error-flash via Window:_runGuarded (fires every drag frame). The second
+-- argument says whether the handle is still down, so a callback can show a preview while the
+-- value is moving and commit once it settles.
 function Slider:_fireCallback(value)
-    self.window:_runGuarded(self, self.callback, value)
+    self.window:_runGuarded(self, self.callback, value, self.dragging == true)
 end
 
 function Slider:Set(value, skipCallback)
@@ -590,12 +689,14 @@ function Slider:_minWidth()
     if self.icon then
         w += 22 -- 16 icon + 6 gap
     end
-    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    -- measure what actually renders: the title shows the translated string
+    w += functions.textWidth(self.window.theme.Font, 16, locale.resolve(self.name))
     w += 12 -- gap before the value
     w += functions.textWidth(self.window.theme.Font, 15, self:_format(self.value))
     return math.max(w, 160)
 end
 
 moveable(Slider)
+lockable(Slider)
 
 return Slider

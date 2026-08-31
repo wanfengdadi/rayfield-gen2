@@ -15,6 +15,7 @@
         "gethui",
         "getcustomasset",
         "getgenv",
+        "setclipboard",
         "describe",
         "it",
         "expect",

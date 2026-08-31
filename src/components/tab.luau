@@ -14,11 +14,10 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
-local functions = require(utility.functions)
-local locale = require(utility.locale)
 local assignOrder = require(utility.ordering)
 local hapticEngine = require(utility.HapticEngine)
 local search = require(script.Parent.search)
+local tabSelector = require(script.Parent.tabSelector)
 
 -- Walk a tab or group's children (groups nest) and tear each element down: drop its flag from
 -- the window registry and disconnect every connection it owns, so nothing outlives the
@@ -44,20 +43,17 @@ local function teardownElements(window, elements)
             element._dragConnection:Disconnect()
             element._dragConnection = nil
         end
+        -- a keybind removed mid-rebind would otherwise leave the window skipping its toggle
+        -- key (and every keybind bailing) forever
+        if window._recordingKeybind == element then
+            window._recordingKeybind = nil
+        end
         if element._outsideClickConn then
             window:Disconnect(element._outsideClickConn)
             element._outsideClickConn = nil
         end
     end
 end
-
--- Pill transparencies per state. Gradient stays constant (theme TabBackground/TabStroke), selection is just transparency.
-local tabStates = {
-    selected = { background = 0, stroke = 0, content = 0 },
-    hover = { background = 0.4, stroke = 0.3, content = 0.3 },
-    unselected = { background = 0.8, stroke = 0.65, content = 0.5 },
-    hidden = { background = 1, stroke = 1, content = 1 },
-}
 
 local selectTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local hoverTweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -81,125 +77,9 @@ function Tab.new(window, properties)
     -- a tab needs at least one of a name or an icon to show in the selector
     assert(self.name or self.icon, "A tab needs a name or an icon.")
 
-    if not self.neglectSelector then -- Allow for tabs to be hidden from the tab selector, for Rayfield Settings.
-        -- Topbar Item
-        self.topbarItem = self.window:Create("Frame", {
-            Name = self.name,
-            Size = UDim2.fromOffset(0, 34), -- min size, grows with content
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-            BorderSizePixel = 0,
-
-            -- Animation
-            BackgroundTransparency = 1, -- In = 0 / 0.8
-            Visible = false, -- In = true
-
-            LayoutOrder = self.customOrder or 0,
-
-            Parent = self.window.tabList,
-        })
-
-        self.topbarItemInteract = self.window:Create("TextButton", {
-            Active = false,
-            BackgroundTransparency = 1,
-            Size = UDim2.fromScale(1, 1),
-            BorderSizePixel = 0,
-            Text = "",
-            TextTransparency = 1,
-
-            Parent = self.topbarItem,
-        })
-
-        self.window:Create("UICorner", {
-            Parent = self.topbarItem,
-        }, { CornerRadius = "PillCornerRadius" })
-
-        self.topbarItemGradient = self.window:Create("UIGradient", {
-            Rotation = 90,
-
-            Parent = self.topbarItem,
-        }, { Color = { "TabBackground", functions.toColorSequence } })
-
-        self.topbarItemStroke = self.window:Create("UIStroke", {
-            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-            Color = Color3.fromRGB(255, 255, 255),
-
-            -- Animation
-            Transparency = 1, -- In = 0 / 0.5
-
-            Parent = self.topbarItem,
-        })
-
-        self.topbarItemStrokeGradient = self.window:Create("UIGradient", {
-            Rotation = 90,
-
-            Parent = self.topbarItemStroke,
-        }, { Color = { "TabStroke", functions.toColorSequence } })
-
-        self.topbarItemContainer = self.window:Create("Frame", {
-            Size = UDim2.fromOffset(0, 34),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundTransparency = 1,
-            BorderSizePixel = 0,
-
-            Parent = self.topbarItem,
-        })
-
-        self.window:Create("UIPadding", {
-            PaddingLeft = UDim.new(0, 13),
-            PaddingRight = UDim.new(0, 14),
-
-            Parent = self.topbarItemContainer,
-        })
-
-        self.topbarItemLayout = self.window:Create("UIListLayout", {
-            Padding = UDim.new(0, 6),
-            FillDirection = Enum.FillDirection.Horizontal,
-            VerticalAlignment = Enum.VerticalAlignment.Center,
-            HorizontalAlignment = Enum.HorizontalAlignment.Center,
-            SortOrder = Enum.SortOrder.LayoutOrder,
-
-            Parent = self.topbarItemContainer,
-        })
-
-        if self.icon then
-            self.topbarItemIcon = self.window:Create("ImageLabel", {
-                -- Configurables
-                -- raw value: Create routes Image through image.resolve, which already handles
-                -- numbers and rbxassetid strings (concat here would double the prefix)
-                Image = self.icon,
-
-                Size = UDim2.fromOffset(16, 16),
-                BorderSizePixel = 0,
-                BackgroundTransparency = 1,
-
-                -- Animation
-                ImageTransparency = 1, -- In = 0 / 0.5
-
-                Parent = self.topbarItemContainer,
-            }, { ImageColor3 = "TabColor" })
-        end
-
-        if self.name then
-            self.topbarItemTitle = self.window:Create("TextLabel", {
-                -- Configurables
-                Text = locale.t(self.name), -- tab name
-
-                Size = UDim2.fromOffset(0, 16),
-                BorderSizePixel = 0,
-                BackgroundTransparency = 1,
-                TextSize = 16,
-                AutomaticSize = Enum.AutomaticSize.XY,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                TextWrapped = true,
-                LayoutOrder = 1,
-
-                -- Animation
-                TextTransparency = 1, -- In = 0 / 0.5
-
-                Parent = self.topbarItemContainer,
-            }, { TextColor3 = "TabColor", FontFace = "Font" })
-        end
+    -- Allow for tabs to be hidden from the tab selector, for Rayfield Settings.
+    if not self.neglectSelector then
+        tabSelector.build(self, self.window.layout)
     end
 
     -- Tab Page
@@ -279,30 +159,12 @@ function Tab:_applyVisual(stateName, tweenInfo)
         return
     end
 
-    local state = tabStates[stateName]
+    local state = tabSelector.states[self.window.layout.mode][stateName]
     if not state then
         return
     end
 
-    if tweenInfo then
-        variables.tweenService:Create(self.topbarItem, tweenInfo, { BackgroundTransparency = state.background }):Play()
-        variables.tweenService:Create(self.topbarItemStroke, tweenInfo, { Transparency = state.stroke }):Play()
-        if self.topbarItemIcon then
-            variables.tweenService:Create(self.topbarItemIcon, tweenInfo, { ImageTransparency = state.content }):Play()
-        end
-        if self.topbarItemTitle then
-            variables.tweenService:Create(self.topbarItemTitle, tweenInfo, { TextTransparency = state.content }):Play()
-        end
-    else
-        self.topbarItem.BackgroundTransparency = state.background
-        self.topbarItemStroke.Transparency = state.stroke
-        if self.topbarItemIcon then
-            self.topbarItemIcon.ImageTransparency = state.content
-        end
-        if self.topbarItemTitle then
-            self.topbarItemTitle.TextTransparency = state.content
-        end
-    end
+    tabSelector.applyVisual(self, state, tweenInfo)
 end
 
 -- Flourish: spin the pill's fill + stroke gradients one full turn back to their resting 90deg.
@@ -395,7 +257,27 @@ function Tab:CreateSection(properties)
     return self:_register(require(script.Parent.section).new(self, properties))
 end
 
+-- Text (a title, a body, or both)
+function Tab:CreateText(properties)
+    return self:_register(require(script.Parent.text).new(self, properties))
+end
+
+-- Divider
+function Tab:CreateDivider(properties)
+    return self:_register(require(script.Parent.divider).new(self, properties))
+end
+
 -- Stat
+-- Progress bar
+function Tab:CreateProgress(properties)
+    return self:_register(require(script.Parent.progress).new(self, properties))
+end
+
+-- Console / code block
+function Tab:CreateConsole(properties)
+    return self:_register(require(script.Parent.console).new(self, properties))
+end
+
 function Tab:CreateStat(properties)
     return self:_register(require(script.Parent.stat).new(self, properties))
 end

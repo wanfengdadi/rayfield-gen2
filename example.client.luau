@@ -28,8 +28,8 @@ local translations = {
 local window = Rayfield:CreateWindow({
     name = "Example",
     subtitle = "Rayfield Gen2",
-    theme = "cobalt",
     translations = translations,
+    sidebarLayout = true, -- flip this for tabs across the top instead of down the left
     configuration = {
         autoSave = true,
         autoLoad = true,
@@ -37,8 +37,9 @@ local window = Rayfield:CreateWindow({
     },
 })
 
--- Topbar tag, next to the window title.
-window:CreateTag({ text = "Beta", color = Color3.fromRGB(255, 175, 15) })
+-- Rail sections group the tabs under them. Sidebar layout only - on the top strip they do
+-- nothing. This one heads the list, so it carries no space above it.
+window:CreateSection({ name = "General" })
 
 -- Home ----------------------------------------------------------------------
 local home = window:CreateTab({ name = "Home", icon = 93364949241311 })
@@ -201,6 +202,82 @@ local rightColumn = grid:CreateGroup({ direction = "column" })
 rightColumn:CreateToggle({ name = "ESP", value = true })
 rightColumn:CreateToggle({ name = "Tracers" })
 
+-- Text ----------------------------------------------------------------------
+-- this one follows tabs, so it sits with a gap above it
+window:CreateSection({ name = "Reference" })
+
+local text = window:CreateTab({ name = "Text", icon = 100604009889706 })
+
+text:CreateSection({ name = "Text" })
+
+-- a title and a body, the usual shape
+text:CreateText({
+    name = "Read this first",
+    text = "Text carries a title, a body, or both. Either half can be left out and the card closes up around what's left.",
+})
+
+-- title only, for a heading that isn't a section
+text:CreateText({ name = "Heading on its own" })
+
+-- body only, evenly padded with no room held for the missing title
+text:CreateText({
+    text = "Body on its own, for a note that doesn't need a heading over it.",
+})
+
+-- with an icon beside the title
+text:CreateText({
+    name = "Worth knowing",
+    text = "An icon sits to the left of the title.",
+    icon = 93364949241311,
+})
+
+local live = text:CreateText({ name = "Changes at runtime", text = "Waiting." })
+
+text:CreateButton({
+    name = "Rewrite the body",
+    callback = function()
+        live:Set("Rewritten at " .. os.date("%H:%M:%S") .. ".")
+    end,
+})
+
+text:CreateButton({
+    name = "Rewrite the title",
+    callback = function()
+        live:SetTitle("Retitled")
+    end,
+})
+
+text:CreateSection({ name = "Dividers" })
+
+text:CreateText({ text = "A plain rule, with the default room around it." })
+text:CreateDivider()
+
+text:CreateText({ text = "A rule with a word in the middle." })
+text:CreateDivider({ text = "or" })
+
+text:CreateText({ text = "More room above and below." })
+text:CreateDivider({ text = "spaced", spacing = 24 })
+
+text:CreateText({ text = "No rule at all, just the room. A spacer." })
+text:CreateDivider({ line = false, spacing = 20 })
+
+text:CreateText({ text = "The one below starts bare and gains a word." })
+local divider = text:CreateDivider()
+
+text:CreateButton({
+    name = "Give the divider a word",
+    callback = function()
+        divider:Set("added later")
+    end,
+})
+
+text:CreateButton({
+    name = "Take it back off",
+    callback = function()
+        divider:Set("")
+    end,
+})
+
 -- Language ------------------------------------------------------------------
 local language = window:CreateTab({ name = "Language", icon = 100604009889706 })
 
@@ -227,6 +304,110 @@ language:CreateDropdown({
             })
         end
         window:SetLocale(localeIds[value] or "en")
+    end,
+})
+
+-- What's new -----------------------------------------------------------------
+local whatsNew = window:CreateTab({ name = "What's New", icon = 93364949241311 })
+
+whatsNew:CreateSection({ name = "Progress" })
+
+local download = whatsNew:CreateProgress({
+    name = "Download",
+    description = "Takes a range like a slider does. The readout is a percentage unless you give it a line of your own.",
+    range = { 0, 100 },
+    value = 35,
+    format = function(value, _, max)
+        return string.format("%d of %d MB", value, max)
+    end,
+})
+
+whatsNew:CreateProgress({
+    name = "Setup",
+    description = "A stepped bar counts stages instead of distance.",
+    steps = 5,
+    value = 2,
+})
+
+whatsNew:CreateProgress({
+    name = "Syncing",
+    text = "Please wait",
+    indeterminate = true, -- a sweep, for work with no known length
+})
+
+whatsNew:CreateSlider({
+    name = "Download progress",
+    description = "Drives the bar above. The slider now tells its callback whether you are still dragging.",
+    range = { 0, 100 },
+    value = 35,
+    suffix = "%",
+    forgetState = true,
+    callback = function(value, dragging)
+        download:Set(value)
+        download:SetText(if dragging then "Downloading" else nil)
+    end,
+})
+
+whatsNew:CreateSection({ name = "Output" })
+
+local console = whatsNew:CreateConsole({
+    name = "Console",
+    text = "-- output lands here",
+    height = 130,
+    follow = true, -- pins itself to the newest line
+    maxLines = 50, -- past this the oldest roll off the top
+})
+
+whatsNew:CreateButton({
+    name = "Log a line",
+    description = "The block holds its height and scrolls inside itself, so the page never grows.",
+    callback = function()
+        console:Append(string.format("[%s] player joined", os.date("%H:%M:%S")))
+    end,
+})
+
+local group = whatsNew:CreateGroup()
+
+group:CreateButton({
+    name = "Copy",
+    callback = function()
+        window:Notify({
+            title = if console:Copy() then "Copied" else "No clipboard here",
+            content = "Copy needs an executor that provides setclipboard.",
+        })
+    end,
+})
+
+group:CreateButton({
+    name = "Clear",
+    callback = function()
+        console:Clear()
+    end,
+})
+
+whatsNew:CreateSection({ name = "Locking" })
+
+local lockable = whatsNew:CreateToggle({
+    name = "Auto Farm",
+    description = "Lock this and it dims, stops taking input, and never fires its callback.",
+    value = false,
+    forgetState = true,
+    callback = function(state)
+        print("this never runs while the toggle is locked", state)
+    end,
+})
+
+whatsNew:CreateToggle({
+    name = "Lock Auto Farm",
+    description = "Locking is what a key check or a missing dependency should do to an element.",
+    value = false,
+    forgetState = true,
+    callback = function(state)
+        if state then
+            lockable:Lock("Needs a premium key")
+        else
+            lockable:Unlock()
+        end
     end,
 })
 
