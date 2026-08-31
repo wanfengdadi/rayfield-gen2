@@ -56,6 +56,7 @@ export type Stat = types.Stat
 export type Progress = types.Progress
 export type Console = types.Console
 export type Section = types.Section
+export type TabSection = types.TabSection
 export type Text = types.Text
 export type Divider = types.Divider
 export type Tag = types.Tag

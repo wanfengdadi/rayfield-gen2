@@ -244,6 +244,7 @@ function Window.new(properties)
         themeProperties = {},
         localeProperties = {},
         tabs = {},
+        tabSections = {},
         tags = {},
         selectedTab = nil,
         theme = resolveTheme(properties.theme or properties.Theme),
@@ -836,6 +837,37 @@ function Window:CreateTab(properties)
     return newTab
 end
 
+-- A heading in the sidebar rail. Same props as a tab's CreateSection, and it groups the tab
+-- rows created after it the way that one groups elements. Sidebar layout only.
+function Window:CreateSection(properties)
+    assert(not self.unloaded, "Cannot create a section on an unloaded window.")
+    local section = require(script.Parent.tabSection).new(self, properties)
+    table.insert(self.tabSections, section)
+
+    -- built after the window is already open: reveal it now, the same way a late tab reveals
+    -- its row rather than waiting for the next open
+    if not section.inert and not self.hidden and not self.minimised then
+        section:_setVisible(true)
+        section:_setShown(true, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
+    end
+
+    return section
+end
+
+-- Sections ride with the rows they label, so every path that fades or hides the rail's rows
+-- says the same thing to them.
+function Window:_setTabSectionsShown(shown, tweenInfo)
+    for _, section in self.tabSections do
+        section:_setShown(shown, tweenInfo)
+    end
+end
+
+function Window:_setTabSectionsVisible(visible)
+    for _, section in self.tabSections do
+        section:_setVisible(visible)
+    end
+end
+
 function Window:CreateTag(properties)
     assert(not self.unloaded, "Cannot create a tag on an unloaded window.")
     local newTag = require(script.Parent.tag).new(self, properties)
@@ -1101,6 +1133,7 @@ function Window:Hide()
             tab:_applyVisual("hidden", fadeInfo)
         end
     end
+    self:_setTabSectionsShown(false, fadeInfo)
 
     self:_fadeSelectedElementsOut()
 
@@ -1196,6 +1229,8 @@ function Window:ToggleMinimise()
                     tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
                 end
             end
+            self:_setTabSectionsVisible(true)
+            self:_setTabSectionsShown(true, fadeInfo)
 
             self:_revealElements(0.035, 0.4)
         end)
@@ -1215,6 +1250,7 @@ function Window:ToggleMinimise()
                 tab:_applyVisual("hidden", fadeInfo)
             end
         end
+        self:_setTabSectionsShown(false, fadeInfo)
 
         task.delay(0.3, function()
             if not self.minimised then
@@ -1226,6 +1262,7 @@ function Window:ToggleMinimise()
                     tab.topbarItem.Visible = false
                 end
             end
+            self:_setTabSectionsVisible(false)
         end)
 
         self:_fadeSurfaces(false, fadeInfo)
@@ -2057,6 +2094,8 @@ function Window:_quickRestore()
                 tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
             end
         end
+        self:_setTabSectionsVisible(true)
+        self:_setTabSectionsShown(true, fadeInfo)
 
         self:_revealElements(0.035, 0.4)
     end)
@@ -2150,6 +2189,12 @@ function Window:_firstShow()
     -- together rather than making a long list crawl in one at a time.
     task.spawn(function()
         local info = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+        -- headings arrive together, ahead of the stagger: a row shouldn't land under a
+        -- heading that hasn't turned up yet
+        self:_setTabSectionsVisible(true)
+        self:_setTabSectionsShown(true, info)
+
         local staggered = 0
         for _, tab in pairs(self.tabs) do
             if not tab.neglectSelector then

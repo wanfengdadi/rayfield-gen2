@@ -29,13 +29,17 @@ local window = Rayfield:CreateWindow({
     name = "Example",
     subtitle = "Rayfield Gen2",
     translations = translations,
-    sidebarLayout = false, -- flip this for tabs down the left instead of across the top
+    sidebarLayout = true, -- flip this for tabs across the top instead of down the left
     configuration = {
         autoSave = true,
         autoLoad = true,
         fileName = "ExampleConfigFile",
     },
 })
+
+-- Rail sections group the tabs under them. Sidebar layout only - on the top strip they do
+-- nothing. This one heads the list, so it carries no space above it.
+window:CreateSection({ name = "General" })
 
 -- Home ----------------------------------------------------------------------
 local home = window:CreateTab({ name = "Home", icon = 93364949241311 })
@@ -199,6 +203,9 @@ rightColumn:CreateToggle({ name = "ESP", value = true })
 rightColumn:CreateToggle({ name = "Tracers" })
 
 -- Text ----------------------------------------------------------------------
+-- this one follows tabs, so it sits with a gap above it
+window:CreateSection({ name = "Reference" })
+
 local text = window:CreateTab({ name = "Text", icon = 100604009889706 })
 
 text:CreateSection({ name = "Text" })

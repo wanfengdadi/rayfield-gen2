@@ -368,5 +368,94 @@ return function()
             makeSidebar()
             expect(window.topbar.Size.Y.Offset).to.equal(layouts.sidebar.topbarHeight)
         end)
+
+        describe("rail sections", function()
+            local function paddingOf(section)
+                return section.padding.PaddingTop.Offset
+            end
+
+            it("heads the rail with no space above, and takes a gap once something is", function()
+                makeSidebar()
+
+                local first = window:CreateSection({ name = "General" })
+                expect(first.main.Parent).to.equal(window.tabList)
+                expect(paddingOf(first)).to.equal(0)
+
+                -- a section following only another section still counts as having something above
+                local second = window:CreateSection({ name = "Modes" })
+                expect(paddingOf(second)).to.equal(6)
+
+                window:CreateTab({ name = "Home" })
+                local third = window:CreateSection({ name = "Reference" })
+                expect(paddingOf(third)).to.equal(6)
+            end)
+
+            it("clears the row under it, whatever sits above", function()
+                makeSidebar()
+                expect(window:CreateSection({ name = "General" }).padding.PaddingBottom.Offset).to.equal(3)
+                window:CreateTab({ name = "Home" })
+                expect(window:CreateSection({ name = "Modes" }).padding.PaddingBottom.Offset).to.equal(3)
+            end)
+
+            it("ignores the settings tab, which never takes a row", function()
+                makeSidebar()
+                -- rfSettings is built with the window and is neglectSelector, so the first
+                -- user section still heads the rail
+                expect(#window.tabs > 0).to.equal(true)
+                expect(paddingOf(window:CreateSection({ name = "General" }))).to.equal(0)
+            end)
+
+            it("sizes to its content rather than a fixed height", function()
+                makeSidebar()
+                local section = window:CreateSection({ name = "General" })
+                expect(section.main.AutomaticSize).to.equal(Enum.AutomaticSize.Y)
+                expect(section.main.Size.Y.Offset).to.equal(0)
+                expect(section.main.Size.X.Scale).to.equal(1)
+                expect(section.main.Size.X.Offset).to.equal(-40)
+            end)
+
+            it("builds an icon only when one is asked for", function()
+                makeSidebar()
+                expect(window:CreateSection({ name = "Plain" }).iconLabel).never.to.be.ok()
+                expect(window:CreateSection({ name = "Iconned", icon = 93364949241311 }).iconLabel).to.be.ok()
+            end)
+
+            it("builds nothing on the top strip, and hands back an inert handle", function()
+                makeWindow()
+                local section = window:CreateSection({ name = "General" })
+                expect(section.inert).to.equal(true)
+                expect(section.main).never.to.be.ok()
+                -- still safe to call, so a dev swapping layouts doesn't have to guard every call
+                section:_setShown(true, false)
+                section:_setVisible(true)
+                section:Remove()
+            end)
+
+            it("drops itself from the window on Remove", function()
+                makeSidebar()
+                local section = window:CreateSection({ name = "General" })
+                expect(#window.tabSections).to.equal(1)
+                section:Remove()
+                expect(#window.tabSections).to.equal(0)
+            end)
+
+            it("fades with the rows it labels", function()
+                makeSidebar()
+                local section = window:CreateSection({ name = "General" })
+
+                window:_setTabSectionsVisible(true)
+                window:_setTabSectionsShown(true, false)
+                expect(section.main.Visible).to.equal(true)
+                expect(section.title.TextTransparency).to.equal(0.6)
+
+                window:_setTabSectionsShown(false, false)
+                expect(section.title.TextTransparency).to.equal(1)
+                -- fading out doesn't stop it drawing; the collapse does that separately
+                expect(section.main.Visible).to.equal(true)
+
+                window:_setTabSectionsVisible(false)
+                expect(section.main.Visible).to.equal(false)
+            end)
+        end)
     end)
 end

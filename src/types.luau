@@ -318,6 +318,12 @@ export type Console = Moveable & {
 
 export type Section = Moveable & {}
 
+-- A heading in the sidebar rail rather than in a tab's element list. Not Moveable: the rail
+-- orders itself by the order tabs and sections are created, the way tabs themselves do.
+export type TabSection = {
+    Remove: (self: TabSection) -> (),
+}
+
 export type Text = Moveable & {
     name: string, -- the title
     text: string, -- the body
@@ -387,6 +393,8 @@ export type Window = {
     -- writes route through the control's Set
     Flags: { [string]: any },
     CreateTab: (self: Window, props: TabProps) -> Tab,
+    -- sidebar layout only; does nothing under the top strip
+    CreateSection: (self: Window, props: SectionProps) -> TabSection,
     CreateTag: (self: Window, props: TagProps) -> Tag,
     Notify: (self: Window, props: NotifyProps) -> (),
     Toast: (self: Window, props: ToastProps) -> (),

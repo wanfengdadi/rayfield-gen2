@@ -12,7 +12,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Rayfield = require(ReplicatedStorage.Rayfield)
 
-return function(tab: Rayfield.Tab)
+return function(window: Rayfield.Window, tab: Rayfield.Tab)
+    -- a heading in the sidebar rail, not in a tab's element list
+    local railSection: Rayfield.TabSection = window:CreateSection({ name = "General" })
+    railSection:Remove()
+
     local progress: Rayfield.Progress = tab:CreateProgress({ name = "Progress" })
     progress:Set(0.5)
     local progressValue: number = progress:Get()
