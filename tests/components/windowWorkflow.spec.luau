@@ -1165,6 +1165,74 @@ return function()
             expect(restored).to.equal(true)
         end)
 
+        -- Every update has to keep reading what an older one wrote. These configs are written
+        -- by hand in the shapes older versions saved, not by the current code, so a change to
+        -- the serialisation shape breaks here rather than in someone's game.
+        describe("configs written by older versions", function()
+            local function writeConfig(w, flags)
+                local _, fullPath = w:GetPath()
+                files[fullPath] = variables.httpService:JSONEncode(flags)
+            end
+
+            it("restores a colour saved before the alpha byte existed", function()
+                local w = newWindow(true)
+                writeConfig(w, { accent = "336699" }) -- six chars, the pre-alpha shape
+                local tab = w:CreateTab({ name = "Main" })
+                local picker = tab:CreateColorPicker({ name = "Accent", flag = "accent" })
+                w:Show()
+
+                expect(picker.value).to.equal(Color3.fromHex("336699"))
+                expect(picker.alpha).to.equal(1) -- nothing saved, so it keeps the default
+            end)
+
+            it("restores a colour saved with the alpha byte", function()
+                local w = newWindow(true)
+                writeConfig(w, { accent = "336699cc" })
+                local tab = w:CreateTab({ name = "Main" })
+                local picker = tab:CreateColorPicker({ name = "Accent", flag = "accent" })
+                w:Show()
+
+                expect(picker.value).to.equal(Color3.fromHex("336699"))
+                expect(picker.alpha).to.equal(0.8)
+            end)
+
+            it("restores the values and keybinds an older version wrote", function()
+                local w = newWindow(true)
+                writeConfig(w, {
+                    autoFarm = true,
+                    speed = 42,
+                    playerName = "someone",
+                    mode = { "Fast" },
+                    bind = { "Enum.KeyCode", Enum.KeyCode.M.Value },
+                })
+                local tab = w:CreateTab({ name = "Main" })
+                local toggle = tab:CreateToggle({ name = "Auto Farm", flag = "autoFarm", value = false })
+                local slider = tab:CreateSlider({ name = "Speed", flag = "speed", range = { 0, 100 }, value = 0 })
+                local input = tab:CreateInput({ name = "Player Name", flag = "playerName" })
+                local dropdown = tab:CreateDropdown({ name = "Mode", flag = "mode", options = { "Slow", "Fast" } })
+                local keybind = tab:CreateKeybind({ name = "Bind", flag = "bind", value = Enum.KeyCode.Q })
+                w:Show()
+
+                expect(toggle.value).to.equal(true)
+                expect(slider.value).to.equal(42)
+                expect(input.value).to.equal("someone")
+                expect(dropdown.value[1]).to.equal("Fast")
+                expect(keybind.value).to.equal(Enum.KeyCode.M)
+            end)
+
+            it("ignores a flag whose element is gone, and leaves a missing one at its default", function()
+                local w = newWindow(true)
+                writeConfig(w, { removedElement = "whatever", autoFarm = true })
+                local tab = w:CreateTab({ name = "Main" })
+                local toggle = tab:CreateToggle({ name = "Auto Farm", flag = "autoFarm", value = false })
+                local untouched = tab:CreateToggle({ name = "New Thing", flag = "newThing", value = false })
+                w:Show()
+
+                expect(toggle.value).to.equal(true)
+                expect(untouched.value).to.equal(false)
+            end)
+        end)
+
         it("round trips the same way with no flag, using the name-derived key", function()
             local w1 = newWindow(false)
             local tab1 = w1:CreateTab({ name = "Main" })

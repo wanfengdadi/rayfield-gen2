@@ -129,8 +129,8 @@ end
 -- Fade with the rows around it. Visible is left alone here, the same way a row's is, so a
 -- collapse can fade the rail out before it stops drawing it.
 function TabSection:_setShown(shown, animate)
-    if self.inert then
-        return
+    if not self.main then
+        return -- never built (top strip), or already removed
     end
     local w = self.window
     w:_reveal(self.title, { TextTransparency = if shown then 0.6 else 1 }, animate)
@@ -140,15 +140,12 @@ function TabSection:_setShown(shown, animate)
 end
 
 function TabSection:_setVisible(visible)
-    if not self.inert then
+    if self.main then
         self.main.Visible = visible
     end
 end
 
 function TabSection:Remove()
-    if self.inert then
-        return
-    end
     local index = table.find(self.window.tabSections, self)
     if index then
         table.remove(self.window.tabSections, index)

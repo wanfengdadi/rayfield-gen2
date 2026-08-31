@@ -431,12 +431,17 @@ return function()
                 section:Remove()
             end)
 
-            it("drops itself from the window on Remove", function()
+            it("drops itself from the window on Remove, and stays safe to call after", function()
                 makeSidebar()
                 local section = window:CreateSection({ name = "General" })
                 expect(#window.tabSections).to.equal(1)
                 section:Remove()
                 expect(#window.tabSections).to.equal(0)
+
+                -- a spent handle behaves like one that never built anything
+                section:Remove()
+                section:_setShown(true, false)
+                section:_setVisible(true)
             end)
 
             it("fades with the rows it labels", function()
