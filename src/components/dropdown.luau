@@ -1254,6 +1254,15 @@ function Dropdown:_deriveSelection()
     return not sameSelection(self.value, previous)
 end
 
+-- Put every row's LayoutOrder back in step with its index. Removing from the middle leaves
+-- gaps, and a later Add takes its order from the row count, so without this a new option can
+-- land in a gap rather than at the end.
+function Dropdown:_reindexOptions()
+    for index, data in self._optionFrames do
+        data.frame.LayoutOrder = index
+    end
+end
+
 -- Point an existing row at a different option. Everything that reads the option reads
 -- data.name, so this is the whole of it; the row keeps its instances and its connections.
 function Dropdown:_rebindOption(data, name, index)
@@ -1367,6 +1376,7 @@ function Dropdown:Remove(option)
         if data.name == option then
             self:_destroyOption(data)
             table.remove(self._optionFrames, i)
+            self:_reindexOptions()
             break
         end
     end

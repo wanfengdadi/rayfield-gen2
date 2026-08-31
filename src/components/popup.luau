@@ -74,13 +74,19 @@ local stack = {}
 -- press would fall through the whole stack.
 local consumedEscape = nil
 
-local function topmost(popup)
+-- Drop entries whose popup is gone. A popup torn down with its window never runs Close, so
+-- liveness is the only thing that can be trusted here.
+local function pruneStack()
     for index = #stack, 1, -1 do
         local open = stack[index]
         if open._closed or not open.screenGui.Parent then
             table.remove(stack, index)
         end
     end
+end
+
+local function topmost(popup)
+    pruneStack()
     return stack[#stack] == popup
 end
 
@@ -111,6 +117,9 @@ function Popup.new(window, properties)
     end
 
     self:_build()
+    -- prune on the way in as well as on Escape: a window unloaded with popups open leaves
+    -- dead entries behind, and nothing else would clear them until the next Escape
+    pruneStack()
     table.insert(stack, self) -- built, so it has a screenGui for the liveness prune
 
     task.spawn(function()

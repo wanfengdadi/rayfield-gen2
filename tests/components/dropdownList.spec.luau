@@ -482,5 +482,49 @@ return function()
             drop:_bringIntoView()
             expect(page.CanvasPosition.Y).to.equal(0)
         end)
+
+        describe("row order", function()
+            -- the rows sort on LayoutOrder, so it has to stay in step with the option list.
+            -- removing from the middle used to leave gaps a later Add could land in.
+            local function ordersOf(drop)
+                local out = {}
+                for _, data in drop._optionFrames do
+                    table.insert(out, string.format("%s=%d", data.name, data.frame.LayoutOrder))
+                end
+                return table.concat(out, " ")
+            end
+
+            it("keeps LayoutOrder in step with the options after a removal", function()
+                makeWindow()
+                local tab = makePage(300)
+                local drop = tab:CreateDropdown({
+                    name = "Choice",
+                    options = { "A", "B", "C", "D" },
+                    forgetState = true,
+                })
+
+                drop:Remove("B")
+                drop:Remove("C")
+                drop:Add("E")
+
+                expect(table.concat(drop.options, ",")).to.equal("A,D,E")
+                -- the row added last has to sort last, not into the gap the removals left
+                expect(ordersOf(drop)).to.equal("A=1 D=2 E=3")
+            end)
+
+            it("still numbers rows from one after shrinking off the end", function()
+                makeWindow()
+                local tab = makePage(300)
+                local drop = tab:CreateDropdown({
+                    name = "Choice",
+                    options = { "A", "B", "C" },
+                    forgetState = true,
+                })
+
+                drop:Refresh({ "A" })
+                drop:Add("Z")
+                expect(ordersOf(drop)).to.equal("A=1 Z=2")
+            end)
+        end)
     end)
 end
