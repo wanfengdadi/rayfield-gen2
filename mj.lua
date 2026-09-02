@@ -821,8 +821,8 @@ EasingDirection.Out),UDim2.new(0.5,360,0.5,0),UDim2.new(0.5,0,0.5,0),6,8 local f
 3,9)end function ae.new(m,n)n=if typeof(n)=='table'then n else{}local o=setmetatable({window=assert(m,
 'Missing argument #1 (Window expected)'),title=n.title or n.Title or'Notification',content=n.content or n.Content or'',
 icon=n.icon or n.Icon,_hovered=false,_dismissed=false},ae)o.duration=n.duration or n.Duration or l(o.content)local p=o.
-icon~=nil and o.icon~=0 and o.icon~=''o.main=o.window:Create('Frame',{Name='Notification',BackgroundTransparency=1,Size=
-UDim2.new(1,0,0,0),BorderSizePixel=0,ZIndex=ai.zIndex.notification,Parent=o.window.notifications})o.window:Create(
+icon~=nil and o.icon~=0 and o.icon~=''local q=o.window:_notificationContainer()o.main=o.window:Create('Frame',{Name='Notification',BackgroundTransparency=1,Size=
+UDim2.new(1,0,0,0),BorderSizePixel=0,ZIndex=ai.zIndex.notification,Parent=q})o.window:Create(
 'UIPadding',{PaddingTop=UDim.new(0,k),Parent=o.main})o.body=o.window:Create('Frame',{BackgroundColor3=Color3.fromRGB(255
 ,255,255),Size=UDim2.new(1,0,1,0),Position=h,AnchorPoint=Vector2.new(0.5,0.5),Active=true,BorderSizePixel=0,ZIndex=ai.
 zIndex.notification,BackgroundTransparency=1,Parent=o.main})o.window:Create('UIGradient',{Rotation=270,Offset=Vector2.
@@ -1738,7 +1738,7 @@ fileName=L.fileName or L.FileName,customFolder=L.customFolder or L.CustomFolder}
 __index=function(M,N)local O=L.controls[N]return O and O.value end,__newindex=function(M,N,O)local P=L.controls[N]if not
 P then ak.warn("Rayfield: no flag '"..tostring(N).."' to set")return end P:Set(O)end,__iter=function()local M return
 function()local N M,N=next(L.controls,M)if M then return M,N.value end return nil end end})L.settings={toggleKeybind=
-Enum.KeyCode.K,mouseOverride=true,keepOnScreen=true,welcomeToast=true,haptics=true,showProfile=true}L.screenGui=L:
+Enum.KeyCode.K,mouseOverride=true,keepOnScreen=true,welcomeToast=true,haptics=true,showProfile=true,notificationPosition='Top Right'}L.screenGui=L:
 Create('ScreenGui',{Name=f.httpService:GenerateGUID(false),IgnoreGuiInset=true,ResetOnSpawn=false,Enabled=true,
 DisplayOrder=ai.displayOrder.window,ZIndexBehavior=Enum.ZIndexBehavior.Global,Parent=f.guiContainer})L.main=L:Create(
 'Frame',{BackgroundColor3=Color3.fromRGB(255,255,255),Name=L.name,ZIndex=1,AnchorPoint=Vector2.new(0.5,0.5),Position=
@@ -1831,12 +1831,20 @@ return K end function h._restoreLate(I,J)if not I._loadedConfig or not J.flag or
 not J.forgetState and I.configuration.autoSave and not I._loading then task.spawn(I.Save,I)end end function h.
 _unregisterControl(I,J)if J.flag and I.controls[J.flag]==J then I.controls[J.flag]=nil end end function h._keybindUsing(
 I,J,K)if typeof(J)~='EnumItem'or J==Enum.KeyCode.Unknown then return nil end for L,M in I.tabs do for N,O in M.elements
-do if O~=K and O.__type=='Keybind'and O.value==J then return O end end end return nil end function h.Notify(I,J)if I.
-unloaded then return end if not I.notifications then I.notifications=I:Create('Frame',{Name='Notifications',Size=UDim2.
-new(0,300,0,800),Position=UDim2.new(1,-20,1,-20),AnchorPoint=Vector2.new(1,1),BackgroundTransparency=1,Parent=I.
-screenGui})I:Create('UIListLayout',{FillDirection=Enum.FillDirection.Vertical,VerticalAlignment=Enum.VerticalAlignment.
-Bottom,HorizontalAlignment=Enum.HorizontalAlignment.Center,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,0),
-Parent=I.notifications})end return ac(ab.Parent.notification).new(I,J)end function h.Toast(I,J)if I.unloaded then return
+do if O~=K and O.__type=='Keybind'and O.value==J then return O end end end return nil end function h._notificationContainer(I,J)
+local K=tostring(J or I.settings.notificationPosition or 'Top Right')
+local L={['Top Left']={x=0,y=0,ax=0,ay=0,h='Top'},['Top Right']={x=1,y=0,ax=1,ay=0,h='Top'},['Bottom Left']={x=0,y=1,ax=0,ay=1,h='Bottom'},['Bottom Right']={x=1,y=1,ax=1,ay=1,h='Bottom'}}
+local M=L[K] or L['Top Right']
+local N='_notifications_'..K:gsub('%s+','_')
+local O=I[N]
+if not O or not O.Parent then
+O=I:Create('Frame',{Name=N,Size=UDim2.new(0,300,0,800),Position=UDim2.new(M.x,if M.x==1 then-20 else 20,M.y,if M.y==1 then-20 else 20),AnchorPoint=Vector2.new(M.ax,M.ay),BackgroundTransparency=1,Parent=I.screenGui})
+I:Create('UIListLayout',{FillDirection=Enum.FillDirection.Vertical,VerticalAlignment=if M.h=='Bottom' then Enum.VerticalAlignment.Bottom else Enum.VerticalAlignment.Top,HorizontalAlignment=if M.ax==1 then Enum.HorizontalAlignment.Right else Enum.HorizontalAlignment.Left,SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,0),Parent=O})
+I[N]=O
+end
+return O
+end
+function h.Notify(I,J)if I.unloaded then return end J=if typeof(J)=='table'then J else{}local K=J.position or J.Position or I.settings.notificationPosition or 'Top Right'if K~='Top Left'and K~='Top Right'and K~='Bottom Left'and K~='Bottom Right'then K='Top Right'end J.position=K return ac(ab.Parent.notification).new(I,J,I:_notificationContainer(K))end function h.Toast(I,J)if I.unloaded then return
 end J=if typeof(J)=='table'then J else{}local K=J.position or J.Position or'Top'local L=typeof(K)~='string'or K:lower()
 ~='bottom'J.position=if L then'Top'else'Bottom'local M=if L then'_toastsTop'else'_toastsBottom'local N=I[M]if not N then
 N=I:Create('Frame',{Name='Toasts',Size=UDim2.new(0,p,1,-24),Position=if L then m else UDim2.new(0.5,0,1,-12),AnchorPoint
@@ -1930,7 +1938,7 @@ I.layout.mode=='sidebar'and I.profile then I.rfSettings:CreateToggle{name='Show 
 value=I.settings.showProfile,callback=function(J)e.setProfileEnabled(I,J)I:SaveSettings()end}end I.rfSettings:
 CreateToggle{name='Keep window on screen',description=
 [[Stops the window being dragged off the edge of the screen and lost.]],value=I.settings.keepOnScreen,callback=function(
-J)I.settings.keepOnScreen=J I:SaveSettings()end}I.rfSettings:CreateButton{name='Reset Window Position',callback=function
+J)I.settings.keepOnScreen=J I:SaveSettings()end}I.rfSettings:CreateDropdown{name='Notification Position',description='Choose where notifications appear.',options={'Top Left','Top Right','Bottom Left','Bottom Right'},value=I.settings.notificationPosition or'Top Right',callback=function(J)I.settings.notificationPosition=J I:SaveSettings()end}I.rfSettings:CreateButton{name='Reset Window Position',callback=function
 ()f.tweenService:Create(I.main,TweenInfo.new(0.5,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{Position=UDim2.
 new(0.5,0,0.5,0)}):Play()f.tweenService:Create(I.drag.drag,TweenInfo.new(0.5,Enum.EasingStyle.Exponential,Enum.
 EasingDirection.Out),{Position=UDim2.new(0.5,0,0.5,I.size.Y.Offset/2+15)}):Play()end}if next(I.configuration)~=nil then
@@ -2214,7 +2222,7 @@ string?,value:number?,display:string?,compact:boolean?,changeMode:string?,change
 export type ProgressProps={name:string?,description:string?,icon:(string|number)?,range:{number}?,value:number?,steps:
 number?,text:string?,format:((value:number,min:number,max:number)->string)?,showValue:boolean?,indeterminate:boolean?}
 export type ConsoleProps={name:string?,description:string?,text:string?,height:number?,follow:boolean?,maxLines:number?}
-export type NotifyProps={title:string?,content:string?,icon:(string|number)?,duration:number?}export type ToastProps={
+export type NotifyProps={title:string?,content:string?,icon:(string|number)?,duration:number?,position:'Top Left'|'Top Right'|'Bottom Left'|'Bottom Right'?}export type ToastProps={
 title:string?,subtitle:string?,subtitleAbove:boolean?,icon:(string|number)?,avatar:number?,minWidth:number?,duration:
 number?,position:'Top'|'Bottom'?}export type PopupBox={title:string?,description:string?,icon:(string|number)?}export
 type PopupOption={text:string?,style:string?,callback:(()->())?}export type PopupProps={title:string?,subtitle:string?,
@@ -2643,12 +2651,12 @@ then ak=af.sanitizeFile(ah.name)end if ak==''then ak='Configuration'end return a
 end return ag end)()end,[64]=function()local aa,ab,ac=a(64)local ad return(function(...)local ae,af,ag,ah,ai,aj=ac(ab.
 Parent.variables),ac(ab.Parent.filesystem),ac(ab.Parent.persistencePaths),ac(ab.Parent.persistenceWrite),ac(ab.Parent.
 enums),{}type SettingsWindow={settings:{toggleKeybind:EnumItem,mouseOverride:boolean,keepOnScreen:boolean,welcomeToast:
-boolean,haptics:boolean,showProfile:boolean}}type DecodedSettings={toggleKeybind:{[number]:unknown}?,mouseOverride:
+boolean,haptics:boolean,showProfile:boolean,notificationPosition:string}}type DecodedSettings={toggleKeybind:{[number]:unknown}?,mouseOverride:
 unknown?,keepOnScreen:unknown?,welcomeToast:unknown?,haptics:unknown?,showProfile:unknown?}function aj.getSettingsPath()
 :(string,string)return ag.getSettingsPath()end function aj.saveSettings(ak:SettingsWindow):boolean local al,am=aj.
 getSettingsPath()local b:{[string]:unknown}={toggleKeybind={tostring(ak.settings.toggleKeybind.EnumType),ak.settings.
 toggleKeybind.Value}::{unknown},mouseOverride=ak.settings.mouseOverride,keepOnScreen=ak.settings.keepOnScreen,
-welcomeToast=ak.settings.welcomeToast,haptics=ak.settings.haptics,showProfile=ak.settings.showProfile}local c,d=pcall(ae
+welcomeToast=ak.settings.welcomeToast,haptics=ak.settings.haptics,showProfile=ak.settings.showProfile,notificationPosition=ak.settings.notificationPosition}local c,d=pcall(ae
 .httpService.JSONEncode,ae.httpService,b)if not c then return false end local e=pcall(ah.write,al,am,d)if not e then
 return false end return true end local function ak(al:string):(DecodedSettings?,string?)local am=false pcall(function()
 am=af.isfile(al)end)if not am then return nil,nil end local b,c=pcall(af.readfile,al)if not b or type(c)~='string'then
@@ -2660,7 +2668,7 @@ end if not c then return false end if c.toggleKeybind then pcall(function()local
 toggleKeybind=f end end end)end if type(c.mouseOverride)=='boolean'then al.settings.mouseOverride=c.mouseOverride end if
 type(c.keepOnScreen)=='boolean'then al.settings.keepOnScreen=c.keepOnScreen end if type(c.welcomeToast)=='boolean'then
 al.settings.welcomeToast=c.welcomeToast end if type(c.haptics)=='boolean'then al.settings.haptics=c.haptics end if type(
-c.showProfile)=='boolean'then al.settings.showProfile=c.showProfile end return true end return aj end)()end,[65]=
+c.showProfile)=='boolean'then al.settings.showProfile=c.showProfile end if type(c.notificationPosition)=='string' and (c.notificationPosition=='Top Left'or c.notificationPosition=='Top Right'or c.notificationPosition=='Bottom Left'or c.notificationPosition=='Bottom Right')then al.settings.notificationPosition=c.notificationPosition end return true end return aj end)()end,[65]=
 function()local aa,ab,ac=a(65)local ad return(function(...)local ae,af,ag=ac(ab.Parent.filesystem),{},'.saving'function
 af.tempPathFor(ah:string):string return ah..ag end function af.write(ah:string,ai:string,aj:string)local ak=af.
 tempPathFor(ai)ae.ensureDir(ah)ae.writefile(ak,aj)if ae.readfile(ak)~=aj then error'parked copy did not write cleanly'
