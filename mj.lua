@@ -1802,9 +1802,9 @@ Enum.SortOrder.LayoutOrder,Parent=L.actionContainer})L.rfSettings=L:CreateTab{na
 neglectSelector=true,forgetState=true}ac(ab.Parent.action).new(L,{name='Close',icon=ai.icons.close,order=1,callback=
 function()L:ToggleHide()end})L.minimiseAction=ac(ab.Parent.action).new(L,{name='Minimise',icon=ai.icons.minimise,order=2
 ,callback=function()L:ToggleMinimise()end})L.settingsAction=ac(ab.Parent.action).new(L,{name='Settings',icon=ai.icons.
-settings,order=3,linkedTab=L.rfSettings,callback=function()L.rfSettings:Select()end})d.build(L)L:_applyRailWidth()L.
+settings,order=3,linkedTab=L.rfSettings,callback=function()L.rfSettings:Select()end})if L.layout.mode=='sidebar'then L.sidebarToggleAction=ac(ab.Parent.action).new(L,{name='Toggle Sidebar',icon=ai.icons.chevron,order=4,callback=function()L:ToggleSidebar()end})L.sidebarToggleAction.iconLabel.Rotation=0 end d.build(L)L:_applyRailWidth()L._sidebarWidth=b.railWidthFor(L.layout,L.size.X.Offset)L.
 unloaded=false L.minimised=false L.hidden=true L.animating=false L._revealing=false L.hasShownOnce=false L.
-_collapsedShown=false L:LoadSettings()if L.layout.mode=='sidebar'then e.reflowProfile(L)e.setSubtitle(L,L.profileText)
+_collapsedShown=false L._sidebarCollapsed=false L:LoadSettings()if L.layout.mode=='sidebar'then e.reflowProfile(L)e.setSubtitle(L,L.profileText)
 end al.setContainer(L.screenGui)al.setEnabled(L.settings.haptics)c.buildCollapsedFace(L)L:_bindKeybind()L:
 _bindMouseOverride()L:_bindTopbarDrag()L:_watchViewport()L:_buildSettingsUI()L:_applyTextScale()if L.settings.uiMarquee and not L.hidden then L:_startMarquee()end L:_syncLiveAnimation()return L end function
 h._syncLiveAnimation(I)if not I.theme.LiveAnimation then I._liveAnimating=false return end if I._liveAnimating then
@@ -1876,7 +1876,37 @@ L)end end I:_setTabSectionsShown(false,L)I:_fadeSelectedElementsOut()local P=f.t
 Position=J})P.Completed:Connect(function()if I.unloaded or not I.hidden then return end I._collapsedShown=true D(I,true)
 I.collapsedInteract.Visible=true I.animating=false I._revealing=false end)P:Play()f.tweenService:Create(I.windowCorner,N
 ,{CornerRadius=UDim.new(1,0)}):Play()task.delay(0.18,function()if not I.hidden then return end I.topbar.Visible=false I:
-_setContentVisible(false)c.setCollapsedShown(I,true,O)end)end function h.ToggleHide(I)if I.animating then return end if
+_setContentVisible(false)c.setCollapsedShown(I,true,O)end)end function h.ToggleSidebar(I)
+if I.unloaded or I.layout.mode~='sidebar' or I.hidden or I.minimised or I.animating or not I.sidebar then return end
+I.animating=true
+local S=I:_uiSpeed()
+local width=I._sidebarWidth or I.sidebar.Size.X.Offset
+if width<=0 then width=b.railWidthFor(I.layout,I.size.X.Offset) end
+local A=TweenInfo.new(0.38*S,Enum.EasingStyle.Quint,Enum.EasingDirection.InOut)
+local B=TweenInfo.new(0.24*S,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)
+if I._sidebarCollapsed then
+ I._sidebarCollapsed=false
+ I.sidebar.Visible=true
+ I.sidebar.Size=UDim2.new(0,0,1,-I.layout.chromeHeight)
+ I.elements.Size=UDim2.new(1,0,1,-I.layout.chromeHeight)
+ I:_fadeSelectedElementsOut()
+ if I.sidebarToggleAction and I.sidebarToggleAction.iconLabel then f.tweenService:Create(I.sidebarToggleAction.iconLabel,B,{Rotation=0,ImageTransparency=0.2}):Play() end
+ f.tweenService:Create(I.sidebar,A,{Size=UDim2.new(0,width,1,-I.layout.chromeHeight)}):Play()
+ f.tweenService:Create(I.elements,A,{Size=UDim2.new(1,-width,1,-I.layout.chromeHeight),Position=UDim2.fromScale(1,1)}):Play()
+ f.tweenService:Create(I.bottomFade,A,{Size=UDim2.new(1,-width,I.layout.fadeSize.Y.Scale,I.layout.fadeSize.Y.Offset)}):Play()
+ task.delay(0.38*S,function() if I.unloaded or I.hidden then return end I:_revealElements(0.025,0.4) I.animating=false end)
+else
+ I._sidebarCollapsed=true
+ I._sidebarWidth=width
+ I:_fadeSelectedElementsOut()
+ if I.sidebarToggleAction and I.sidebarToggleAction.iconLabel then f.tweenService:Create(I.sidebarToggleAction.iconLabel,B,{Rotation=180,ImageTransparency=0.6}):Play() end
+ f.tweenService:Create(I.sidebar,A,{Size=UDim2.new(0,0,1,-I.layout.chromeHeight)}):Play()
+ f.tweenService:Create(I.elements,A,{Size=UDim2.new(1,0,1,-I.layout.chromeHeight),Position=UDim2.new(1,18,1,0)}):Play()
+ f.tweenService:Create(I.bottomFade,A,{Size=UDim2.new(1,0,I.layout.fadeSize.Y.Scale,I.layout.fadeSize.Y.Offset)}):Play()
+ task.delay(0.38*S,function() if I.unloaded or I.hidden then return end f.tweenService:Create(I.elements,B,{Position=UDim2.fromScale(1,1)}):Play() task.wait(0.06*S) if I.unloaded or I.hidden then return end I:_revealElements(0.02,0.4) I.animating=false end)
+end
+end
+function h.ToggleHide(I)if I.animating then return end if
 I.hidden then I:Show()else I:Hide()end end function h.ToggleMinimise(I)if I.animating or I.hidden then return end if I.
 _searching then d.close(I,{showTabs=true})end I.animating=true local J,K=TweenInfo.new(0.5,Enum.EasingStyle.Exponential,
 Enum.EasingDirection.Out),TweenInfo.new(0.4,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out)if I.minimised then I.
@@ -1902,8 +1932,7 @@ max(M+N,K.Y-M-N))if O==J.X.Offset and P==J.Y.Offset then return J end return UDi
 _clampToScreen(I)I.main.Position=I:_clampedPosition(I.main.Position)end function h._applyWindowSize(I)if I.unloaded then
 return end local J=w(I.layout.mode)local K=J~=I.size I.size=J I:_applyRailWidth()if I.hidden or I.minimised or I.
 animating or I._revealing then I._pendingResize=I._pendingResize or K return end if not K and not I._pendingResize then
-return end I._pendingResize=false I.main.Size=J I:_clampToScreen()I:_syncDragBar()end function h._applyRailWidth(I)if I.
-layout.mode~='sidebar'then return end e.applyWidth(I,b.railWidthFor(I.layout,I.size.X.Offset))end function h.
+return end I._pendingResize=false I.main.Size=J I:_clampToScreen()I:_syncDragBar()end function h._applyRailWidth(I)if I.layout.mode~='sidebar'then return end local J=b.railWidthFor(I.layout,I.size.X.Offset)I._sidebarWidth=J if I._sidebarCollapsed then I.sidebar.Size=UDim2.new(0,0,1,-I.layout.chromeHeight)I.elements.Size=UDim2.new(1,0,1,-I.layout.chromeHeight)I.bottomFade.Size=UDim2.new(1,0,I.layout.fadeSize.Y.Scale,I.layout.fadeSize.Y.Offset)else e.applyWidth(I,J)end end function h.
 _watchViewport(I)local J,K:RBXScriptConnection?=false local function L()if J then return end J=true task.defer(function(
 )J=false I:_applyWindowSize()end)end local function M()if K then I:Disconnect(K)K=nil end local N=f.workspace.
 CurrentCamera if N then K=I:Connect(N:GetPropertyChangedSignal'ViewportSize',L)end L()end I:Connect(f.workspace:
@@ -2273,7 +2302,7 @@ CreateSection:(self:Tab,props:SectionProps)->Section,CreateText:(self:Tab,props:
 Flags:{[string]:any},CreateTab:(self:Window,props:TabProps)->Tab,CreateSection:(self:Window,props:SectionProps)->
 TabSection,CreateTag:(self:Window,props:TagProps)->Tag,Notify:(self:Window,props:NotifyProps)->(),Toast:(self:Window,
 props:ToastProps)->(),Popup:(self:Window,props:PopupProps)->Popup?,Show:(self:Window)->(),Hide:(self:Window)->(),
-ToggleHide:(self:Window)->(),ToggleMinimise:(self:Window)->(),Navigate:(self:Window,tab:string|Tab)->(),ChangeTheme:(
+ToggleHide:(self:Window)->(),ToggleMinimise:(self:Window)->(),ToggleSidebar:(self:Window)->(),Navigate:(self:Window,tab:string|Tab)->(),ChangeTheme:(
 self:Window,theme:Theme)->(),SetLocale:(self:Window,localeId:string)->(),SetTranslator:(self:Window,translator:
 Translator?)->(),RegisterTranslations:(self:Window,translations:Translations)->(),Save:(self:Window,name:string?)->
 boolean,Load:(self:Window,name:string?)->boolean,ListConfigs:(self:Window)->{string},DeleteConfig:(self:Window,name:
