@@ -1870,7 +1870,52 @@ L)end end I:_setTabSectionsShown(false,L)I:_fadeSelectedElementsOut()local P=f.t
 Position=J})P.Completed:Connect(function()if I.unloaded or not I.hidden then return end I._collapsedShown=true D(I,true)
 I.collapsedInteract.Visible=true I.animating=false I._revealing=false end)P:Play()f.tweenService:Create(I.windowCorner,N
 ,{CornerRadius=UDim.new(1,0)}):Play()task.delay(0.18,function()if not I.hidden then return end I.topbar.Visible=false I:
-_setContentVisible(false)c.setCollapsedShown(I,true,O)end)end function h.ToggleSidebar(I)
+_setContentVisible(false)c.setCollapsedShown(I,true,O)end)end function h._syncCollapsedProfile(I,J)
+if I.layout.mode~='sidebar' or not I.profileContainer then return end
+local K=J==true
+if K and I.settings.showProfile and I._sidebarCollapsed then
+ I.profileContainer.Parent=I.main
+ I.profileContainer.AnchorPoint=Vector2.new(0,1)
+ I.profileContainer.Position=UDim2.new(0,16,1,-14)
+ I.profileContainer.Size=UDim2.new(0,220,0,44)
+ I.profileContainer.ZIndex=20
+ I.profileLayout.HorizontalAlignment=Enum.HorizontalAlignment.Left
+ I.profileLabels.Visible=true
+ I.profileContainer.Visible=true
+ I.profileAvatar.ImageTransparency=1
+ I.profileName.TextTransparency=1
+ I.profileSubtitle.TextTransparency=1
+ local L=TweenInfo.new(0.25*I:_uiSpeed(),Enum.EasingStyle.Quint,Enum.EasingDirection.Out)
+ f.tweenService:Create(I.profileAvatar,L,{ImageTransparency=0}):Play()
+ f.tweenService:Create(I.profileName,L,{TextTransparency=0.2}):Play()
+ if I.profileSubtitle.Visible then f.tweenService:Create(I.profileSubtitle,L,{TextTransparency=0.35}):Play() end
+else
+ if I.profileContainer.Parent==I.main then
+  local L=TweenInfo.new(0.18*I:_uiSpeed(),Enum.EasingStyle.Quint,Enum.EasingDirection.In)
+  f.tweenService:Create(I.profileAvatar,L,{ImageTransparency=1}):Play()
+  f.tweenService:Create(I.profileName,L,{TextTransparency=1}):Play()
+  if I.profileSubtitle.Visible then f.tweenService:Create(I.profileSubtitle,L,{TextTransparency=1}):Play() end
+  task.delay(L.Time,function()
+   if I.unloaded or I.profileContainer.Parent~=I.main then return end
+   I.profileContainer.Parent=I.profile
+   I.profileContainer.AnchorPoint=Vector2.new(0,0.5)
+   I.profileContainer.Position=UDim2.new(0,I.layout.rowInset,0.5,0)
+   I.profileContainer.Size=UDim2.new(1,-I.layout.rowInset,1,0)
+   I.profileContainer.ZIndex=1
+   I:reflowProfileForCurrentState()
+  end)
+ end
+end
+end
+function h:reflowProfileForCurrentState()
+if not self.profile then return end
+self.profileContainer.Parent=self.profile
+self.profileContainer.Position=UDim2.new(0,self.layout.rowInset,0.5,0)
+self.profileContainer.Size=UDim2.new(1,-self.layout.rowInset,1,0)
+self.profileLayout.HorizontalAlignment=Enum.HorizontalAlignment.Left
+self.profileLabels.Visible=true
+end
+function h.ToggleSidebar(I)
 if I.unloaded or I.layout.mode~='sidebar' or I.hidden or I.minimised or I.animating or not I.sidebar then return end
 I.animating=true
 local S=I:_uiSpeed()
@@ -1883,6 +1928,7 @@ if I._sidebarCollapsed then
  I.sidebar.Visible=true
  I.sidebar.Size=UDim2.new(0,0,1,-I.layout.chromeHeight)
  I.elements.Size=UDim2.new(1,0,1,-I.layout.chromeHeight)
+ I:_syncCollapsedProfile(false)
  I:_fadeSelectedElementsOut()
  if I.sidebarToggleAction and I.sidebarToggleAction.iconLabel then f.tweenService:Create(I.sidebarToggleAction.iconLabel,B,{Rotation=0,ImageTransparency=0.2}):Play() end
  f.tweenService:Create(I.sidebar,A,{Size=UDim2.new(0,width,1,-I.layout.chromeHeight)}):Play()
@@ -1891,6 +1937,7 @@ if I._sidebarCollapsed then
  task.delay(0.38*S,function() if I.unloaded or I.hidden then return end I:_revealElements(0.025,0.4) I.animating=false end)
 else
  I._sidebarCollapsed=true
+ I:_syncCollapsedProfile(true)
  I._sidebarWidth=width
  I:_fadeSelectedElementsOut()
  if I.sidebarToggleAction and I.sidebarToggleAction.iconLabel then f.tweenService:Create(I.sidebarToggleAction.iconLabel,B,{Rotation=180,ImageTransparency=0.6}):Play() end
@@ -1926,7 +1973,7 @@ max(M+N,K.Y-M-N))if O==J.X.Offset and P==J.Y.Offset then return J end return UDi
 _clampToScreen(I)I.main.Position=I:_clampedPosition(I.main.Position)end function h._applyWindowSize(I)if I.unloaded then
 return end local J=w(I.layout.mode)local K=J~=I.size I.size=J I:_applyRailWidth()if I.hidden or I.minimised or I.
 animating or I._revealing then I._pendingResize=I._pendingResize or K return end if not K and not I._pendingResize then
-return end I._pendingResize=false I.main.Size=J I:_clampToScreen()I:_syncDragBar()end function h._applyRailWidth(I)if I.layout.mode~='sidebar'then return end local J=b.railWidthFor(I.layout,I.size.X.Offset)I._sidebarWidth=J if I._sidebarCollapsed then I.sidebar.Size=UDim2.new(0,0,1,-I.layout.chromeHeight)I.elements.Size=UDim2.new(1,0,1,-I.layout.chromeHeight)I.bottomFade.Size=UDim2.new(1,0,I.layout.fadeSize.Y.Scale,I.layout.fadeSize.Y.Offset)else e.applyWidth(I,J)end end function h.
+return end I._pendingResize=false I.main.Size=J I:_clampToScreen()I:_syncDragBar()end function h._applyRailWidth(I)if I.layout.mode~='sidebar'then return end local J=b.railWidthFor(I.layout,I.size.X.Offset)I._sidebarWidth=J if I._sidebarCollapsed then I.sidebar.Size=UDim2.new(0,0,1,-I.layout.chromeHeight)I:_syncCollapsedProfile(true)I.elements.Size=UDim2.new(1,0,1,-I.layout.chromeHeight)I.bottomFade.Size=UDim2.new(1,0,I.layout.fadeSize.Y.Scale,I.layout.fadeSize.Y.Offset)else e.applyWidth(I,J)end end function h.
 _watchViewport(I)local J,K:RBXScriptConnection?=false local function L()if J then return end J=true task.defer(function(
 )J=false I:_applyWindowSize()end)end local function M()if K then I:Disconnect(K)K=nil end local N=f.workspace.
 CurrentCamera if N then K=I:Connect(N:GetPropertyChangedSignal'ViewportSize',L)end L()end I:Connect(f.workspace:
@@ -1969,7 +2016,7 @@ settings.welcomeToast,callback=function(J)I.settings.welcomeToast=J I:SaveSettin
 callback=function(J)I.settings.haptics=J al.setEnabled(J)I:SaveSettings()end}I.rfSettings:CreateSection{name='Window'}if
 I.layout.mode=='sidebar'and I.profile then I.rfSettings:CreateToggle{name='Show profile',description=
 [[Shows your avatar and name at the base of the sidebar. Turn it off to keep them out of a stream or a screenshot.]],
-value=I.settings.showProfile,callback=function(J)e.setProfileEnabled(I,J)I:SaveSettings()end}end I.rfSettings:
+value=I.settings.showProfile,callback=function(J)e.setProfileEnabled(I,J)if I.layout.mode=='sidebar' and I._sidebarCollapsed then I:_syncCollapsedProfile(J)end I:SaveSettings()end}end I.rfSettings:
 CreateToggle{name='Keep window on screen',description=
 [[Stops the window being dragged off the edge of the screen and lost.]],value=I.settings.keepOnScreen,callback=function(
 J)I.settings.keepOnScreen=J I:SaveSettings()end}I._settingsControls=I._settingsControls or{} local J=I.rfSettings:CreateDropdown{name='Notification Position',description='Choose where notifications appear.',options={'Top Left','Top Right','Bottom Left','Bottom Right'},value=I.settings.notificationPosition or'Top Right',callback=function(K)I.settings.notificationPosition=K I:SaveSettings()end} I._settingsControls.notificationPosition=J local K=I.rfSettings:CreateDropdown{name='UI Open/Close Speed',description='Controls the speed of opening and closing the UI.',options={'Slow','Normal','Fast'},value=I.settings.openCloseSpeed or'Normal',callback=function(L)I.settings.openCloseSpeed=L I:SaveSettings()end} I._settingsControls.openCloseSpeed=K local L=I.rfSettings:CreateDropdown{name='Text Size',description='Choose the UI text size.',options={'Small','Medium','Large'},value=I.settings.textSize or'Medium',callback=function(M)I.settings.textSize=M I:_applyTextScale()I:SaveSettings()end} I._settingsControls.textSize=L local M=I.rfSettings:CreateToggle{name='UI Border Marquee',description='Adds a solid-color moving light around the UI border.',value=I.settings.uiMarquee,callback=function(N)I.settings.uiMarquee=N I:SaveSettings()if N then I:_startMarquee()else I:_stopMarquee()end end} I._settingsControls.uiMarquee=M local N=I.rfSettings:CreateDropdown{name='Marquee Color',description='Choose the color of the moving border light.',options={'Ice Blue','Purple','Mint','Rose','White','Gold'},value=I.settings.uiMarqueeColor or'Ice Blue',callback=function(O)I.settings.uiMarqueeColor=O I:SaveSettings()if I.settings.uiMarquee then I:_startMarquee()end end} I._settingsControls.uiMarqueeColor=N local O=I.rfSettings:CreateInput{name='UI Corner Radius',description='Adjust window corner radius from 0 to 40.',numeric=true,value=tostring(I.settings.uiCornerRadius or 12),placeholder='0 - 40',clearOnFocus=false,callback=function(P)local Q=tonumber(P)if not Q then return end I:_applyCornerRadius(Q)I:SaveSettings()end} I._settingsControls.uiCornerRadius=O local P=I.rfSettings:CreateInput{name='Tab Corner Radius',description='Adjust tab corner radius from 0 to 40.',numeric=true,value=tostring(I.settings.tabCornerRadius or 12),placeholder='0 - 40',clearOnFocus=false,callback=function(Q)local R=tonumber(Q)if not R then return end I:_applyTabCornerRadius(R)I:SaveSettings()end} I._settingsControls.tabCornerRadius=P local Q=I.rfSettings:CreateDropdown{name='Tab Animation Speed',description='Controls the stagger speed when switching tabs.',options={'Slow','Normal','Fast'},value=I.settings.tabAnimationSpeed or'Normal',callback=function(R)I.settings.tabAnimationSpeed=R I:SaveSettings()end} I._settingsControls.tabAnimationSpeed=Q I.rfSettings:CreateButton{name='Replay Tab Animation',description='Replay the current tab animation.',callback=function()if I.animating or not I.selectedTab then return end local R=I:_tabAnimSpeed()local S=I.selectedTab task.spawn(function()for _,T in ipairs(S.elements)do if I.unloaded or I.hidden or I.selectedTab~=S then return end if T and T._setShown then T:_setShown(false,false)end end task.wait(0.06*R)for _,T in ipairs(S.elements)do if I.unloaded or I.hidden or I.selectedTab~=S then return end if T and T._setShown then T:_setShown(true,true)end task.wait(0.035*R)end end)end}I.rfSettings:CreateButton{name='Reset Everything',description='Reset all Rayfield settings to defaults.',callback=function()I:Popup{title='Reset everything?',content="This clears every saved value. You can't undo it.",options={{text='Cancel'},{text='Reset',style='danger',callback=function()I:_resetSettings()I:_refreshSettingsControls()end}}}end}I.rfSettings:CreateButton{name='Reset Window Position',callback=function
