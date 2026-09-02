@@ -1155,13 +1155,7 @@ UDim.new(0,g.railPadding),PaddingBottom=UDim.new(0,g.railPadding),Parent=f.tabLi
 'UIListLayout',{Padding=UDim.new(0,g.rowSpacing),FillDirection=Enum.FillDirection.Vertical,VerticalAlignment=Enum.
 VerticalAlignment.Top,HorizontalAlignment=Enum.HorizontalAlignment.Center,SortOrder=Enum.SortOrder.LayoutOrder,Parent=f.
 tabList})e(f,g)ak.reflowProfile(f)end function ak.reflowProfile(f)local g,h=f.layout,d(f)if f.profile then f.profile.
-Visible=h end f.tabList.Size=UDim2.new(1,0,1,if h then-g.footerHeight else 0)end function ak.applyWidth(f,g)local h=f.
-layout f.sidebar.Size=UDim2.new(0,g,1,-h.chromeHeight)f.elements.Size=UDim2.new(1,-g,1,-h.chromeHeight)f.bottomFade.Size
-=UDim2.new(1,-g,h.fadeSize.Y.Scale,h.fadeSize.Y.Offset)aj.railWidth(f,g)local i=g<(h.railWidth::number)for j,k in f.tabs
-do if not k.neglectSelector then ai.setRowCollapsed(k,i,h)end end if f.profileContainer then f.profileContainer.Position
-=UDim2.new(0,if i then 0 else h.rowInset,0.5,0)f.profileContainer.Size=UDim2.new(1,if i then 0 else-h.rowInset,1,0)f.
-profileLayout.HorizontalAlignment=if i then Enum.HorizontalAlignment.Center else Enum.HorizontalAlignment.Left f.
-profileLabels.Visible=not i end end function ak.setProfileShown(f,g,h)if not f.profile or not f.profile.Visible then
+Visible=h end f.tabList.Size=UDim2.new(1,0,1,if h then-g.footerHeight else 0)end function ak.applyWidth(f,g)local h=f.layout f.sidebar.Size=UDim2.new(0,g,1,-h.chromeHeight)f.elements.Size=UDim2.new(1,-g,1,-h.chromeHeight)f.bottomFade.Size=UDim2.new(1,-g,h.fadeSize.Y.Scale,h.fadeSize.Y.Offset)aj.railWidth(f,g)local i=g<(h.railWidth::number)for j,k in f.tabs do if not k.neglectSelector then ai.setRowCollapsed(k,i,h)end end if f.profileContainer then local j=(f._sidebarCollapsed==true)f.profileContainer.Position=UDim2.new(0,if j then 16 else h.rowInset,0.5,if j then -14 else 0)f.profileContainer.Size=if j then UDim2.new(0,220,0,44)else UDim2.new(1,-h.rowInset,1,0)f.profileLayout.HorizontalAlignment=Enum.HorizontalAlignment.Left f.profileLabels.Visible=f.settings.showProfile and not j end end function ak.setProfileShown(f,g,h)if not f.profile or not f.profile.Visible then
 return end local i={[f.profileAvatar]={ImageTransparency=if g then 0 else 1,BackgroundTransparency=if g then b else 1},[
 f.profileName]={TextTransparency=if g then al else 1},[f.profileSubtitle]={TextTransparency=if g then am else 1}}for j,k
 in i do if h then af.tweenService:Create(j,h,k):Play()else for l,m in k do j[l]=m end end end end function ak.
@@ -1908,12 +1902,17 @@ else
 end
 end
 function h:reflowProfileForCurrentState()
-if not self.profile then return end
+if not self.profile or not self.profileContainer then return end
 self.profileContainer.Parent=self.profile
+self.profileContainer.AnchorPoint=Vector2.new(0,0.5)
 self.profileContainer.Position=UDim2.new(0,self.layout.rowInset,0.5,0)
 self.profileContainer.Size=UDim2.new(1,-self.layout.rowInset,1,0)
+self.profileContainer.ZIndex=1
 self.profileLayout.HorizontalAlignment=Enum.HorizontalAlignment.Left
-self.profileLabels.Visible=true
+self.profileLabels.Visible=self.settings.showProfile and not self._sidebarCollapsed
+self.profileAvatar.Visible=true
+self.profileName.Visible=true
+if self.profileSubtitle then self.profileSubtitle.Visible=self.profileSubtitle.Text~='' end
 end
 function h.ToggleSidebar(I)
 if I.unloaded or I.layout.mode~='sidebar' or I.hidden or I.minimised or I.animating or not I.sidebar then return end
@@ -1929,6 +1928,7 @@ if I._sidebarCollapsed then
  I.sidebar.Size=UDim2.new(0,0,1,-I.layout.chromeHeight)
  I.elements.Size=UDim2.new(1,0,1,-I.layout.chromeHeight)
  I:_syncCollapsedProfile(false)
+ if I.profileContainer then I.profileLabels.Visible=I.settings.showProfile and not I._sidebarCollapsed end
  I:_fadeSelectedElementsOut()
  if I.sidebarToggleAction and I.sidebarToggleAction.iconLabel then f.tweenService:Create(I.sidebarToggleAction.iconLabel,B,{Rotation=0,ImageTransparency=0.2}):Play() end
  f.tweenService:Create(I.sidebar,A,{Size=UDim2.new(0,width,1,-I.layout.chromeHeight)}):Play()
