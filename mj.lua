@@ -29,22 +29,16 @@ ResetOnSpawn=false m.Enabled=true m.SafeAreaCompatibility=Enum.SafeAreaCompatibi
 ScreenInsets.DeviceSafeInsets m.ZIndexBehavior=Enum.ZIndexBehavior.Sibling m.Parent=f.guiContainer local n=Instance.new
 'ImageLabel'n.Name='Banner'n.AnchorPoint=Vector2.new(0.5,0.5)n.BackgroundColor3=Color3.fromRGB(255,255,255)n.
 BackgroundTransparency=1 n.BorderColor3=Color3.fromRGB(0,0,0)n.BorderSizePixel=0 n.Image=g.resolve(i.icons.banner)n.
-Position=UDim2.fromScale(0.5,0.5)n.Size=UDim2.fromOffset(262,60)n.Parent=m
-local o=Instance.new('Frame')o.Name='LoadingOverlay'o.AnchorPoint=Vector2.new(0.5,0.5)o.Position=UDim2.fromScale(0.5,0.5)o.Size=UDim2.fromOffset(320,150)o.BackgroundTransparency=1 o.ZIndex=1000 o.Parent=m
-local p=Instance.new('Frame')p.Name='Spinner'p.AnchorPoint=Vector2.new(0.5,0.5)p.Position=UDim2.new(0.5,0,0,28)p.Size=UDim2.fromOffset(46,46)p.BackgroundTransparency=1 p.ZIndex=1001 p.Parent=o
-for q=1,10 do local r=Instance.new('Frame')r.Name='Dot'r.AnchorPoint=Vector2.new(0.5,0.5)local t=(q-1)/10*math.pi*2 r.Position=UDim2.new(0.5,math.cos(t)*16,0.5,math.sin(t)*16)r.Size=UDim2.fromOffset(5,5)r.BackgroundColor3=Color3.fromRGB(235,235,235)r.BorderSizePixel=0 r.ZIndex=1002 r.Parent=p local u=Instance.new('UICorner')u.CornerRadius=UDim.new(1,0)u.Parent=r end
-local v=Instance.new('TextLabel')v.Name='Title'v.AnchorPoint=Vector2.new(0.5,0)v.Position=UDim2.new(0.5,0,0,61)v.Size=UDim2.new(1,0,0,28)v.BackgroundTransparency=1 v.Text='Loading'v.TextColor3=Color3.fromRGB(245,245,245)v.TextSize=20 v.Font=Enum.Font.GothamSemibold v.ZIndex=1001 v.Parent=o
-local w=Instance.new('TextLabel')w.Name='Subtitle'w.AnchorPoint=Vector2.new(0.5,0)w.Position=UDim2.new(0.5,0,0,90)w.Size=UDim2.new(1,0,0,22)w.BackgroundTransparency=1 w.Text='Please wait...'w.TextColor3=Color3.fromRGB(150,150,150)w.TextSize=14 w.Font=Enum.Font.Gotham w.ZIndex=1001 w.Parent=o return m end function k.CreateWindow(m,n:j.
+Position=UDim2.fromScale(0.5,0.5)n.Size=UDim2.fromOffset(262,60)n.Parent=m return m end function k.CreateWindow(m,n:j.
 WindowProps):j.Window local o,p:j.Window?,q:(()->())?=(l())if f.secureMode then g.preload(function(r)if r<=0 then return
 end local function s()if not p or p.unloaded then return end p:Notify{title=h.resolve'Secure mode',content=if r==1 then
 h.resolve"An asset couldn't be cached and won't appear."else h.resolve"Some assets couldn't be cached and won't appear."
 }end if p then s()else q=s end end)end local r,s=pcall(function()return(d(c.components.window)::WindowModule).new(n)end)
-if not r then o:Destroy()error(s,0)end local t=s::j.Window p=t
-local function x()local y=m:FindFirstChild('LoadingOverlay')if not y then return end local z=y:FindFirstChild('Spinner')local aa=game:GetService('RunService')local ab=aa.RenderStepped:Connect(function(ac)if y.Parent then z.Rotation=(z.Rotation+180*ac)%360 end end)local ad=n.name or n.Name or'Rayfield' local ae=n.loadingTitle or n.LoadingTitle or ad local af=n.loadingSubtitle or n.LoadingSubtitle or'Loading...' local ag=y:FindFirstChild('Title')local ah=y:FindFirstChild('Subtitle')if ag then ag.Text=tostring(ae)end if ah then ah.Text=tostring(af)end task.wait(2)if not y.Parent then ab:Disconnect()return end for ai,aj in ipairs(y:GetDescendants())do local ak={}if aj:IsA('TextLabel')or aj:IsA('TextButton')or aj:IsA('TextBox')then ak.TextTransparency=1 elseif aj:IsA('ImageLabel')or aj:IsA('ImageButton')then ak.ImageTransparency=1 elseif aj:IsA('Frame')then ak.BackgroundTransparency=1 end if next(ak)then f.tweenService:Create(aj,TweenInfo.new(0.35,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),ak):Play()end end task.wait(0.4)ab:Disconnect()if y.Parent then y:Destroy()end end
-if q then task.spawn(q)q=nil end if f.secureMode then
+if not r then o:Destroy()error(s,0)end local t=s::j.Window p=t if q then task.spawn(q)q=nil end if f.secureMode then
 task.spawn(function()local u,v=f.fontManager:loadFont(i.fontAsset,Enum.FontWeight.Medium),f.fontManager:loadFont(i.
 fontAsset,Enum.FontWeight.SemiBold)if not t.unloaded and u and v and u~=f.fallbackFont and v~=f.fallbackFont then t:
-ChangeTheme{Font=u,TitleFont=v}end end)end task.spawn(function()task.wait(0.2)o:Destroy()task.spawn(x)task.wait(2.85)if not t.unloaded then t:Show()end end)return t end return k end)()end,[3]=function()local b,c,d=a(3)local e return(function(...)local f={
+ChangeTheme{Font=u,TitleFont=v}end end)end task.spawn(function()task.wait(0.5)o:Destroy()task.wait(0.5)if not t.unloaded
+then t:Show()end end)return t end return k end)()end,[3]=function()local b,c,d=a(3)local e return(function(...)local f={
 }f.__index=f f.__type='Action'local g=c.Parent.Parent.utility local h,i,j=d(g.variables),d(g.log),d(g.HapticEngine)
 function f.new(k,l)l=if typeof(l)=='table'then l else{}local m=setmetatable({window=assert(k,
 'Missing argument #1 (Window expected)'),name=l.name or l.Name or'Action',icon=assert(l.icon or l.Icon,
