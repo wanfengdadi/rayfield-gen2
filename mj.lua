@@ -818,13 +818,19 @@ Parent.utility local ag,ah,ai,b,c,d,e,f,g,h,i,j,k=ac(af.variables),ac(af.functio
 ,Enum.EasingDirection.Out),TweenInfo.new(0.3,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),TweenInfo.new(0.6,
 Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),TweenInfo.new(0.9,Enum.EasingStyle.Exponential,Enum.
 EasingDirection.Out),UDim2.new(0.5,360,0.5,0),UDim2.new(0.5,0,0.5,0),6,8 local function l(m)return math.clamp(#m*0.06+3,
-3,9)end function ae.new(m,n)n=if typeof(n)=='table'then n else{}local o=setmetatable({window=assert(m,
+3,9)end function ae.new(m,n,q)n=if typeof(n)=='table'then n else{}local o=setmetatable({window=assert(m,
 'Missing argument #1 (Window expected)'),title=n.title or n.Title or'Notification',content=n.content or n.Content or'',
-icon=n.icon or n.Icon,_hovered=false,_dismissed=false},ae)o.duration=n.duration or n.Duration or l(o.content)local p=o.
-icon~=nil and o.icon~=0 and o.icon~=''local q=o.window:_notificationContainer()o.main=o.window:Create('Frame',{Name='Notification',BackgroundTransparency=1,Size=
+icon=n.icon or n.Icon,position=n.position or n.Position or m.settings.notificationPosition or'Top Right',_hovered=false,_dismissed=false},ae)o.duration=n.duration or n.Duration or l(o.content)local p=o.
+icon~=nil and o.icon~=0 and o.icon~=''q=q or o.window:_notificationContainer(o.position)local r={
+['Top Left']=UDim2.new(0.5,-400,0.5,0),['Top Right']=UDim2.new(0.5,400,0.5,0),
+['Bottom Left']=UDim2.new(0.5,-400,0.5,0),['Bottom Right']=UDim2.new(0.5,400,0.5,0)}
+local t={
+['Top Left']=UDim2.new(0.5,-400,0.5,-190),['Top Right']=UDim2.new(0.5,400,0.5,-190),
+['Bottom Left']=UDim2.new(0.5,-400,0.5,190),['Bottom Right']=UDim2.new(0.5,400,0.5,190)}
+o._startPosition=r[o.position] or r['Top Right']o._endPosition=i o._exitPosition=t[o.position] or t['Top Right']o.main=o.window:Create('Frame',{Name='Notification',BackgroundTransparency=1,Size=
 UDim2.new(1,0,0,0),BorderSizePixel=0,ZIndex=ai.zIndex.notification,Parent=q})o.window:Create(
 'UIPadding',{PaddingTop=UDim.new(0,k),Parent=o.main})o.body=o.window:Create('Frame',{BackgroundColor3=Color3.fromRGB(255
-,255,255),Size=UDim2.new(1,0,1,0),Position=h,AnchorPoint=Vector2.new(0.5,0.5),Active=true,BorderSizePixel=0,ZIndex=ai.
+,255,255),Size=UDim2.new(1,0,1,0),Position=o._startPosition,AnchorPoint=Vector2.new(0.5,0.5),Active=true,BorderSizePixel=0,ZIndex=ai.
 zIndex.notification,BackgroundTransparency=1,Parent=o.main})o.window:Create('UIGradient',{Rotation=270,Offset=Vector2.
 new(0,-0.1),Parent=o.body},{Color={'WindowColor',ah.toColorSequence}})o.window:Create('UICorner',{Parent=o.body},{
 CornerRadius='CornerRoundness'})o.stroke=o.window:Create('UIStroke',{Transparency=1,Parent=o.body},{Color=
@@ -853,7 +859,7 @@ UserInputType.MouseButton1 or r.UserInputType==Enum.UserInputType.Touch then o:_
 TitleFont,16,m.title,n)if m.descriptionLabel then o=o+4+ah.textHeight(m.window.theme.Font,15,m.content,n)end return math
 .max(o,m.iconLabel and 24 or 0)+28 end function ae._show(m)local n=m:_measure()+k if m._dismissed or not m.main.Parent
 then return end b.notify()ag.tweenService:Create(m.main,c,{Size=UDim2.new(1,0,0,n)}):Play()ag.tweenService:Create(m.body
-,f,{Position=i}):Play()ag.tweenService:Create(m.body,d,{BackgroundTransparency=0}):Play()ag.tweenService:Create(m.
+,f,{Position=m._endPosition}):Play()ag.tweenService:Create(m.body,d,{BackgroundTransparency=0}):Play()ag.tweenService:Create(m.
 titleLabel,e,{TextTransparency=0}):Play()ag.tweenService:Create(m.stroke,d,{Transparency=0.95}):Play()ag.tweenService:
 Create(m.shadow,e,{Transparency=0.6}):Play()task.wait(0.05)if m._dismissed or not m.main.Parent then return end if m.
 iconLabel then ag.tweenService:Create(m.iconLabel,e,{ImageTransparency=0}):Play()end task.wait(0.05)if m._dismissed or
@@ -865,7 +871,7 @@ not m.main.Parent then return end ag.tweenService:Create(m.body,d,{BackgroundTra
 Create(m.stroke,d,{Transparency=1}):Play()ag.tweenService:Create(m.shadow,e,{Transparency=1}):Play()ag.tweenService:
 Create(m.titleLabel,e,{TextTransparency=1}):Play()if m.descriptionLabel then ag.tweenService:Create(m.descriptionLabel,e
 ,{TextTransparency=1}):Play()end if m.iconLabel then ag.tweenService:Create(m.iconLabel,e,{ImageTransparency=1}):Play()
-end ag.tweenService:Create(m.body,g,{Size=UDim2.new(1,-90,1,0)}):Play()local p=ag.tweenService:Create(m.main,g,{Size=
+end ag.tweenService:Create(m.body,g,{Size=UDim2.new(1,-90,1,0),Position=m._exitPosition}):Play()local p=ag.tweenService:Create(m.main,g,{Size=
 UDim2.new(1,0,0,0)})p:Play()p.Completed:Wait()if not m.main.Parent then return end for q,r in m._connections do m.window
 :Disconnect(r)end m.window:DestroySubtree(m.main)end return ae end)()end,[16]=function()local aa,ab,ac=a(16)local ad
 return(function(...)local ae={}ae.__index=ae ae.__type='Popup'local af=ab.Parent.Parent.utility local ag,ah,ai,b,c,d,e,f
@@ -1738,7 +1744,7 @@ fileName=L.fileName or L.FileName,customFolder=L.customFolder or L.CustomFolder}
 __index=function(M,N)local O=L.controls[N]return O and O.value end,__newindex=function(M,N,O)local P=L.controls[N]if not
 P then ak.warn("Rayfield: no flag '"..tostring(N).."' to set")return end P:Set(O)end,__iter=function()local M return
 function()local N M,N=next(L.controls,M)if M then return M,N.value end return nil end end})L.settings={toggleKeybind=
-Enum.KeyCode.K,mouseOverride=true,keepOnScreen=true,welcomeToast=true,haptics=true,showProfile=true,notificationPosition='Top Right'}L.screenGui=L:
+Enum.KeyCode.K,mouseOverride=true,keepOnScreen=true,welcomeToast=true,haptics=true,showProfile=true,notificationPosition='Top Right',openCloseSpeed='Normal',textSize='Medium',uiMarquee=false}L.screenGui=L:
 Create('ScreenGui',{Name=f.httpService:GenerateGUID(false),IgnoreGuiInset=true,ResetOnSpawn=false,Enabled=true,
 DisplayOrder=ai.displayOrder.window,ZIndexBehavior=Enum.ZIndexBehavior.Global,Parent=f.guiContainer})L.main=L:Create(
 'Frame',{BackgroundColor3=Color3.fromRGB(255,255,255),Name=L.name,ZIndex=1,AnchorPoint=Vector2.new(0.5,0.5),Position=
@@ -1800,7 +1806,7 @@ settings,order=3,linkedTab=L.rfSettings,callback=function()L.rfSettings:Select()
 unloaded=false L.minimised=false L.hidden=true L.animating=false L._revealing=false L.hasShownOnce=false L.
 _collapsedShown=false L:LoadSettings()if L.layout.mode=='sidebar'then e.reflowProfile(L)e.setSubtitle(L,L.profileText)
 end al.setContainer(L.screenGui)al.setEnabled(L.settings.haptics)c.buildCollapsedFace(L)L:_bindKeybind()L:
-_bindMouseOverride()L:_bindTopbarDrag()L:_watchViewport()L:_buildSettingsUI()L:_syncLiveAnimation()return L end function
+_bindMouseOverride()L:_bindTopbarDrag()L:_watchViewport()L:_buildSettingsUI()L:_applyTextScale()if L.settings.uiMarquee and not L.hidden then L:_startMarquee()end L:_syncLiveAnimation()return L end function
 h._syncLiveAnimation(I)if not I.theme.LiveAnimation then I._liveAnimating=false return end if I._liveAnimating then
 return end I._liveAnimating=true I._liveGeneration=(I._liveGeneration or 0)+1 local J=I._liveGeneration task.spawn(
 function()local K,L=true,TweenInfo.new(10,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)while I._liveGeneration==J and
@@ -1852,15 +1858,15 @@ N=I:Create('Frame',{Name='Toasts',Size=UDim2.new(0,p,1,-24),Position=if L then m
 )I:Create('UIListLayout',{FillDirection=Enum.FillDirection.Vertical,VerticalAlignment=if L then Enum.VerticalAlignment.
 Top else Enum.VerticalAlignment.Bottom,HorizontalAlignment=Enum.HorizontalAlignment.Center,SortOrder=Enum.SortOrder.
 LayoutOrder,Padding=UDim.new(0,0),Parent=N})I[M]=N if L then D(I,false)end end return ac(ab.Parent.toast).new(I,J,N)end
-function h.Popup(I,J)if I.unloaded then return end return ac(ab.Parent.popup).new(I,J)end function h.Hide(I)if I.
-animating or I.hidden then return end if I._searching then d.close(I,{showTabs=false,jumpTo=I.selectedTab and I.
+function h.Popup(I,J)if I.unloaded then return end return ac(ab.Parent.popup).new(I,J)end function h.Hide(I)local S=I:_uiSpeed()if I.
+animating or I.hidden then return end I:_stopMarquee() if I._searching then d.close(I,{showTabs=false,jumpTo=I.selectedTab and I.
 selectedTab.tabPage})end if I._recordingKeybind then I._recordingKeybind:_stopRecording()end I.animating=true I.
 _revealing=true I.hidden=true I.collapsedInteract.Visible=false if I.minimised then I.minimised=false af.assign(I.
 minimiseAction.iconLabel,'Image',ai.icons.minimise)end I._restorePosition=I.main.Position local J,K=I:_collapsedRect()
-local L,M,N,O=TweenInfo.new(0.18,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),TweenInfo.new(0.35,Enum.EasingStyle.
-Exponential,Enum.EasingDirection.InOut),TweenInfo.new(0.35,Enum.EasingStyle.Exponential,Enum.EasingDirection.InOut),
-TweenInfo.new(0.2,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)f.tweenService:Create(I.drag.dragCosmetic,L,{Size=
-UDim2.fromOffset(0,4),BackgroundTransparency=1}):Play()task.delay(0.18,function()if not I.hidden then return end I.drag.
+local L,M,N,O=TweenInfo.new(0.18*S,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),TweenInfo.new(0.35*S,Enum.EasingStyle.
+Exponential,Enum.EasingDirection.InOut),TweenInfo.new(0.35*S,Enum.EasingStyle.Exponential,Enum.EasingDirection.InOut),
+TweenInfo.new(0.2*S,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)f.tweenService:Create(I.drag.dragCosmetic,L,{Size=
+UDim2.fromOffset(0,4),BackgroundTransparency=1}):Play()task.delay(0.18*S,function()if not I.hidden then return end I.drag.
 drag.Visible=false end)I:_fadeSurfaces(false,L)if I.title then f.tweenService:Create(I.title,L,{TextTransparency=1}):
 Play()end if I.subtitle then f.tweenService:Create(I.subtitle,L,{TextTransparency=1}):Play()end if I.topbarIcon then f.
 tweenService:Create(I.topbarIcon,L,{ImageTransparency=1}):Play()end for P,Q in ipairs(I.actionContainer:GetChildren())do
@@ -1923,7 +1929,11 @@ AbsolutePosition+I.main.AbsoluteSize*I.main.AnchorPoint-J:GetMouseLocation()end)
 Q=P.UserInputType.Name if Q=='MouseButton1'or Q=='Touch'then K=false end end)I:Connect(J.WindowFocusReleased,function()K
 =false end)I:Connect(f.runService.RenderStepped,function()if not K then return end if not I:_interactive()then K=false
 return end I.main.Position=N()if I.drag and I.drag.drag then local P=I.main.Position I.drag.drag.Position=UDim2.new(P.X.
-Scale,P.X.Offset,P.Y.Scale,P.Y.Offset+(I.main.Size.Y.Offset/2+15))end end)end function h._buildSettingsUI(I)I.rfSettings
+Scale,P.X.Offset,P.Y.Scale,P.Y.Offset+(I.main.Size.Y.Offset/2+15))end end)end function h._uiSpeed(I)local J={Slow=1.35,Normal=1,Fast=0.7}return J[I.settings.openCloseSpeed] or 1 end
+function h._applyTextScale(I)local J={Small=0.88,Medium=1,Large=1.15}local K=J[I.settings.textSize] or 1 for L,M in I.screenGui:GetDescendants()do if M:IsA'TextLabel' or M:IsA'TextButton' or M:IsA'TextBox'then if M.TextSize and M.TextSize>0 then if not M:GetAttribute('RayfieldBaseTextSize') then M:SetAttribute('RayfieldBaseTextSize',M.TextSize)end local N=M:GetAttribute('RayfieldBaseTextSize')if type(N)=='number'then M.TextSize=math.max(1,math.floor(N*K+0.5))end end end end end
+function h._stopMarquee(I)I._marqueeGeneration=(I._marqueeGeneration or 0)+1 I._marqueeRunning=false if I.marqueeLight then I.marqueeLight.Visible=false end end
+function h._startMarquee(I)I:_stopMarquee()if not I.settings.uiMarquee or I.unloaded or not I.main then return end I._marqueeGeneration=(I._marqueeGeneration or 0)+1 local J=I._marqueeGeneration I._marqueeRunning=true I.marqueeLight=I.marqueeLight or I:Create('Frame',{Name='MarqueeLight',AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(44,3),BackgroundColor3=I.theme.ContentColor or Color3.fromRGB(255,255,255),BorderSizePixel=0,ZIndex=50,Visible=false,Parent=I.main})I.marqueeLight.BackgroundColor3=I.theme.ContentColor or Color3.fromRGB(255,255,255)I.marqueeLight.Visible=true task.spawn(function()local K=0.75 while I._marqueeGeneration==J and I._marqueeRunning and not I.unloaded and not I.hidden do local L={UDim2.new(0,22,0,2),UDim2.new(0.5,0,0,2),UDim2.new(1,-22,0,2),UDim2.new(1,-2,0.5,0),UDim2.new(1,-22,1,-2),UDim2.new(0.5,0,1,-2),UDim2.new(0,22,1,-2),UDim2.new(0,2,0.5,0),UDim2.new(0,22,0,2)}local M={UDim2.fromOffset(44,3),UDim2.fromOffset(44,3),UDim2.fromOffset(44,3),UDim2.fromOffset(3,44),UDim2.fromOffset(44,3),UDim2.fromOffset(44,3),UDim2.fromOffset(44,3),UDim2.fromOffset(3,44)} I.marqueeLight.Position=L[1] for N=1,#L-1 do if I._marqueeGeneration~=J or not I._marqueeRunning or I.hidden then break end I.marqueeLight.Size=M[N]local O=f.tweenService:Create(I.marqueeLight,TweenInfo.new(K,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut),{Position=L[N+1]})O:Play()O.Completed:Wait()end end I._marqueeRunning=false if I.marqueeLight and I._marqueeGeneration==J then I.marqueeLight.Visible=false end end)end
+function h._buildSettingsUI(I)I.rfSettings
 :CreateSection{name='General'}I.rfSettings:CreateKeybind{name='Toggle Keybind',icon=ai.icons.search,value=I.settings.
 toggleKeybind,isMenuToggle=true,onChanged=function(J)I.settings.toggleKeybind=J I:SaveSettings()end}I.rfSettings:
 CreateToggle{name='Unlock cursor while open',description=
@@ -1938,7 +1948,7 @@ I.layout.mode=='sidebar'and I.profile then I.rfSettings:CreateToggle{name='Show 
 value=I.settings.showProfile,callback=function(J)e.setProfileEnabled(I,J)I:SaveSettings()end}end I.rfSettings:
 CreateToggle{name='Keep window on screen',description=
 [[Stops the window being dragged off the edge of the screen and lost.]],value=I.settings.keepOnScreen,callback=function(
-J)I.settings.keepOnScreen=J I:SaveSettings()end}I.rfSettings:CreateDropdown{name='Notification Position',description='Choose where notifications appear.',options={'Top Left','Top Right','Bottom Left','Bottom Right'},value=I.settings.notificationPosition or'Top Right',callback=function(J)I.settings.notificationPosition=J I:SaveSettings()end}I.rfSettings:CreateButton{name='Reset Window Position',callback=function
+J)I.settings.keepOnScreen=J I:SaveSettings()end}I.rfSettings:CreateDropdown{name='Notification Position',description='Choose where notifications appear.',options={'Top Left','Top Right','Bottom Left','Bottom Right'},value=I.settings.notificationPosition or'Top Right',callback=function(J)I.settings.notificationPosition=J I:SaveSettings()end}I.rfSettings:CreateDropdown{name='UI Open/Close Speed',description='Controls the speed of opening and closing the UI.',options={'Slow','Normal','Fast'},value=I.settings.openCloseSpeed or'Normal',callback=function(J)I.settings.openCloseSpeed=J I:SaveSettings()end}I.rfSettings:CreateDropdown{name='Text Size',description='Choose the UI text size.',options={'Small','Medium','Large'},value=I.settings.textSize or'Medium',callback=function(J)I.settings.textSize=J I:_applyTextScale()I:SaveSettings()end}I.rfSettings:CreateToggle{name='UI Border Marquee',description='Adds a solid-color moving light around the UI border.',value=I.settings.uiMarquee,callback=function(J)I.settings.uiMarquee=J I:SaveSettings()if J then I:_startMarquee()else I:_stopMarquee()end end}I.rfSettings:CreateButton{name='Reset Window Position',callback=function
 ()f.tweenService:Create(I.main,TweenInfo.new(0.5,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{Position=UDim2.
 new(0.5,0,0.5,0)}):Play()f.tweenService:Create(I.drag.drag,TweenInfo.new(0.5,Enum.EasingStyle.Exponential,Enum.
 EasingDirection.Out),{Position=UDim2.new(0.5,0,0.5,I.size.Y.Offset/2+15)}):Play()end}if next(I.configuration)~=nil then
@@ -1986,13 +1996,13 @@ I.animating=true I._revealing=true if I.configuration.autoLoad and not I._autoLo
 pcall(I.Load,I)if not J then ak.warn('Rayfield: Failed to load configuration - '..tostring(K))end end I.hidden=false I.
 minimised=false if I._themeRefreshPending then I._themeRefreshPending=false I:_refreshElementThemes()end I.
 collapsedInteract.Visible=false if I._freeMouse then I._freeMouse()end if I.hasShownOnce then I:_quickRestore()else I.
-hasShownOnce=true I:_firstShow()end end function h._quickRestore(I)local J=I:_clampedPosition(I._restorePosition or
-UDim2.new(0.5,0,0.5,0))I._restorePosition=J local K,L,M=TweenInfo.new(0.35,Enum.EasingStyle.Exponential,Enum.
-EasingDirection.InOut),TweenInfo.new(0.35,Enum.EasingStyle.Exponential,Enum.EasingDirection.InOut),TweenInfo.new(0.28,
-Enum.EasingStyle.Exponential,Enum.EasingDirection.Out)c.setCollapsedShown(I,false,TweenInfo.new(0.15,Enum.EasingStyle.
+hasShownOnce=true I:_firstShow()end end function h._quickRestore(I)local S=I:_uiSpeed()local J=I:_clampedPosition(I._restorePosition or
+UDim2.new(0.5,0,0.5,0))I._restorePosition=J local K,L,M=TweenInfo.new(0.35*S,Enum.EasingStyle.Exponential,Enum.
+EasingDirection.InOut),TweenInfo.new(0.35*S,Enum.EasingStyle.Exponential,Enum.EasingDirection.InOut),TweenInfo.new(0.28*S,
+Enum.EasingStyle.Exponential,Enum.EasingDirection.Out)c.setCollapsedShown(I,false,TweenInfo.new(0.15*S,Enum.EasingStyle.
 Quint,Enum.EasingDirection.Out))local N=f.tweenService:Create(I.main,K,{Size=I.size,Position=J})N.Completed:Connect(
 function()if I.hidden or I.unloaded then return end I._collapsedShown=false D(I,true)end)N:Play()f.tweenService:Create(I
-.windowCorner,L,{CornerRadius=I.theme.CornerRoundness}):Play()task.delay(0.22,function()I.topbar.Visible=true I:
+.windowCorner,L,{CornerRadius=I.theme.CornerRoundness}):Play()task.delay(0.22*S,function()I.topbar.Visible=true I:
 _setContentVisible(true)I:_fadeSurfaces(true,M)if I.topbarIcon then f.tweenService:Create(I.topbarIcon,M,{
 ImageTransparency=0}):Play()end if I.title then f.tweenService:Create(I.title,M,{TextTransparency=0}):Play()end if I.
 subtitle then f.tweenService:Create(I.subtitle,M,{TextTransparency=0.7}):Play()end for O,P in ipairs(I.actionContainer:
@@ -2004,24 +2014,24 @@ neglectSelector and P.topbarItem then P.topbarItem.Visible=true P:_applyVisual(i
 delay(0.22,function()I.drag.drag.Position=UDim2.new(J.X.Scale,J.X.Offset,J.Y.Scale,J.Y.Offset+I.size.Y.Offset/2+15)I.
 drag.dragCosmetic.Size=UDim2.fromOffset(0,4)I.drag.dragCosmetic.BackgroundTransparency=1 I.drag.drag.Visible=true f.
 tweenService:Create(I.drag.dragCosmetic,K,{Size=UDim2.fromOffset(100,4),BackgroundTransparency=0.7}):Play()end)task.
-delay(0.6,function()I.animating=false I._revealing=false end)end function h._firstShow(I)I:_setContentVisible(true)I.
-drag.drag.Visible=false I.main.Visible=true f.tweenService:Create(I.main,TweenInfo.new(1,Enum.EasingStyle.Exponential,
-Enum.EasingDirection.InOut),{BackgroundTransparency=0,Size=I.size}):Play()task.wait(0.85)I:_fadeSurfaces(true,TweenInfo.
-new(0.6,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out))task.wait(0.3)if I.icon then f.tweenService:Create(I.
-topbarIcon,TweenInfo.new(0.6,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{ImageTransparency=0}):Play()end if
-I.title then f.tweenService:Create(I.title,TweenInfo.new(0.4,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{
-TextTransparency=0}):Play()end task.wait(0.1)if I.subtitle then f.tweenService:Create(I.subtitle,TweenInfo.new(0.4,Enum.
+delay(0.6,function()I.animating=false I._revealing=false if I.settings.uiMarquee then I:_startMarquee()end end)end function h._firstShow(I)local S=I:_uiSpeed()I:_setContentVisible(true)I.
+drag.drag.Visible=false I.main.Visible=true f.tweenService:Create(I.main,TweenInfo.new(1*S,Enum.EasingStyle.Exponential,
+Enum.EasingDirection.InOut),{BackgroundTransparency=0,Size=I.size}):Play()task.wait(0.85*S)I:_fadeSurfaces(true,TweenInfo.
+new(0.6,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out))task.wait(0.3*S)if I.icon then f.tweenService:Create(I.
+topbarIcon,TweenInfo.new(0.6*S,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{ImageTransparency=0}):Play()end if
+I.title then f.tweenService:Create(I.title,TweenInfo.new(0.4*S,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{
+TextTransparency=0}):Play()end task.wait(0.1*S)if I.subtitle then f.tweenService:Create(I.subtitle,TweenInfo.new(0.4*S,Enum.
 EasingStyle.Exponential,Enum.EasingDirection.Out),{TextTransparency=0.7}):Play()end for J,K in ipairs(I.actionContainer:
-GetChildren())do if K:IsA'Frame'then task.wait(0.02)f.tweenService:Create(K.ImageLabel,TweenInfo.new(0.4,Enum.
+GetChildren())do if K:IsA'Frame'then task.wait(0.02*S)f.tweenService:Create(K.ImageLabel,TweenInfo.new(0.4*S,Enum.
 EasingStyle.Exponential,Enum.EasingDirection.Out),{ImageTransparency=0.6}):Play()end end for J,K in I.tags do K:
-_setShown(true,TweenInfo.new(0.4,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out))end task.wait(0.2)task.spawn(
-function()local J=TweenInfo.new(0.4,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)I:_setTabSectionsVisible(true)I:
+_setShown(true,TweenInfo.new(0.4*S,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out))end task.wait(0.2*S)task.spawn(
+function()local J=TweenInfo.new(0.4*S,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)I:_setTabSectionsVisible(true)I:
 _setTabSectionsShown(true,J)local K=0 for L,M in pairs(I.tabs)do if not M.neglectSelector then M.topbarItem.Visible=true
-M:_applyVisual(if I.selectedTab==M then'selected'else'unselected',J)M:_spinGradients()K+=1 if K<=u then task.wait(t)end
-end end end)I:_revealElements(0.03,2)task.wait(1)I:_syncDragBar()I.drag.drag.Visible=true f.tweenService:Create(I.drag.
-dragCosmetic,TweenInfo.new(0.6,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{BackgroundTransparency=0.7}):
-Play()f.tweenService:Create(I.drag.dragCosmetic,TweenInfo.new(1,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{
-Size=UDim2.fromOffset(100,4)}):Play()I.animating=false I._revealing=false local J=f.localPlayer if J and I.settings.
+M:_applyVisual(if I.selectedTab==M then'selected'else'unselected',J)M:_spinGradients()K+=1 if K<=u then task.wait(t*S)end
+end end end)I:_revealElements(0.03,2)task.wait(1*S)I:_syncDragBar()I.drag.drag.Visible=true f.tweenService:Create(I.drag.
+dragCosmetic,TweenInfo.new(0.6*S,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{BackgroundTransparency=0.7}):
+Play()f.tweenService:Create(I.drag.dragCosmetic,TweenInfo.new(1*S,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{
+Size=UDim2.fromOffset(100,4)}):Play()I.animating=false I._revealing=false if I.settings.uiMarquee then I:_startMarquee()end local J=f.localPlayer if J and I.settings.
 welcomeToast and c.isNewUser()then I:Toast{title=J.DisplayName,subtitle=aj.resolve'Signed in as',subtitleAbove=true,
 avatar=J.UserId,minWidth=220}end end function h.GetPath(I)return ah.getPath(I)end function h.Save(I,J)if J~=nil and(
 type(J)~='string'or J=='')then return false end return ah.save(I,J)end function h.Load(I,J)if J~=nil and(type(J)~=
@@ -2652,11 +2662,11 @@ end return ag end)()end,[64]=function()local aa,ab,ac=a(64)local ad return(funct
 Parent.variables),ac(ab.Parent.filesystem),ac(ab.Parent.persistencePaths),ac(ab.Parent.persistenceWrite),ac(ab.Parent.
 enums),{}type SettingsWindow={settings:{toggleKeybind:EnumItem,mouseOverride:boolean,keepOnScreen:boolean,welcomeToast:
 boolean,haptics:boolean,showProfile:boolean,notificationPosition:string}}type DecodedSettings={toggleKeybind:{[number]:unknown}?,mouseOverride:
-unknown?,keepOnScreen:unknown?,welcomeToast:unknown?,haptics:unknown?,showProfile:unknown?}function aj.getSettingsPath()
+unknown?,keepOnScreen:unknown?,welcomeToast:unknown?,haptics:unknown?,showProfile:unknown?,notificationPosition:string?,openCloseSpeed:string?,textSize:string?,uiMarquee:boolean?}function aj.getSettingsPath()
 :(string,string)return ag.getSettingsPath()end function aj.saveSettings(ak:SettingsWindow):boolean local al,am=aj.
 getSettingsPath()local b:{[string]:unknown}={toggleKeybind={tostring(ak.settings.toggleKeybind.EnumType),ak.settings.
 toggleKeybind.Value}::{unknown},mouseOverride=ak.settings.mouseOverride,keepOnScreen=ak.settings.keepOnScreen,
-welcomeToast=ak.settings.welcomeToast,haptics=ak.settings.haptics,showProfile=ak.settings.showProfile,notificationPosition=ak.settings.notificationPosition}local c,d=pcall(ae
+welcomeToast=ak.settings.welcomeToast,haptics=ak.settings.haptics,showProfile=ak.settings.showProfile,notificationPosition=ak.settings.notificationPosition,openCloseSpeed=ak.settings.openCloseSpeed,textSize=ak.settings.textSize,uiMarquee=ak.settings.uiMarquee}local c,d=pcall(ae
 .httpService.JSONEncode,ae.httpService,b)if not c then return false end local e=pcall(ah.write,al,am,d)if not e then
 return false end return true end local function ak(al:string):(DecodedSettings?,string?)local am=false pcall(function()
 am=af.isfile(al)end)if not am then return nil,nil end local b,c=pcall(af.readfile,al)if not b or type(c)~='string'then
