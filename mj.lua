@@ -1076,15 +1076,14 @@ Parent=h.searchPage k.descriptor.main.Visible=true end end end local function h(
 if l.descriptor and l.descriptor.main and l.descriptor.main.Parent then l.descriptor.main.LayoutOrder=k.descOrder l.
 descriptor.main.Parent=k.homeParent l.descriptor.main.Visible=true end end i._searchUnits={}end function aj.open(i)if i.
 _searching or i.minimised or not i:_interactive()then return end i._searching=true g(i)f(i,'')i:_jumpTo(i.searchPage)e(i
-,false,ak)task.delay(ak.Time,function()if i._searching and i.layout.mode~='sidebar'then i.tabList.Visible=false end end)
-i.searchPill.Visible=true d(i,true,ak)i.searchInput:CaptureFocus()af.tweenService:Create(i.searchAction.iconLabel,ak,{
+,false,ak)task.delay(ak.Time,function()if i._searching and i.layout.mode~='sidebar'then i.tabList.Visible=false end end)local w=if i._sidebarCollapsed then-30 else-((i._sidebarWidth or i.layout.railWidth)+30)i.searchPill.Size=UDim2.new(1,if i.layout.mode=='sidebar'then w else-35,0,35)i.searchPill.Visible=true d(i,true,ak)i.searchInput:CaptureFocus()af.tweenService:Create(i.searchAction.iconLabel,ak,{
 ImageTransparency=am}):Play()end function aj.close(i,j)if not i._searching then return end j=j or{}i._searching=false i.
 searchInput.Text=''i.searchInput:ReleaseFocus()i.searchEmpty.Visible=false h(i)local k=if j.jumpTo==nil then i.
 selectedTab and i.selectedTab.tabPage else j.jumpTo if k then i:_jumpTo(k)end d(i,false,ak)task.delay(ak.Time,function()
 if not i._searching then i.searchPill.Visible=false end end)if j.showTabs then i.tabList.Visible=true e(i,true,ak)end af
 .tweenService:Create(i.searchAction.iconLabel,ak,{ImageTransparency=al}):Play()end function aj.toggle(i)if i._searching
 then aj.close(i,{showTabs=true})else aj.open(i)end end function aj.railWidth(i,j)if i.searchPill then i.searchPill.Size=
-UDim2.new(1,-(j+30),0,35)end end function aj.build(i)i._searching=false i.searchPage=i:Create('ScrollingFrame',{Name=
+UDim2.new(1,if i._sidebarCollapsed then-30 else-(j+30),0,35)end end function aj.build(i)i._searching=false i.searchPage=i:Create('ScrollingFrame',{Name=
 'Search',Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0.5,0,0,68),AnchorPoint=Vector2.new(0.5,0.5),BorderSizePixel=0,
 BackgroundTransparency=1,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(0,0,0,0),ScrollBarThickness=0,
 ScrollingDirection=Enum.ScrollingDirection.Y,LayoutOrder=2000,Parent=i.elements})i:Create('UIListLayout',{Padding=UDim.
@@ -1888,6 +1887,7 @@ if I._sidebarCollapsed then
  f.tweenService:Create(I.sidebar,A,{Size=UDim2.new(0,width,1,-I.layout.chromeHeight)}):Play()
  f.tweenService:Create(I.elements,A,{Size=UDim2.new(1,-width,1,-I.layout.chromeHeight),Position=UDim2.fromScale(1,1)}):Play()
  f.tweenService:Create(I.bottomFade,A,{Size=UDim2.new(1,-width,I.layout.fadeSize.Y.Scale,I.layout.fadeSize.Y.Offset)}):Play()
+ if I.searchPill then f.tweenService:Create(I.searchPill,A,{Size=UDim2.new(1,-(width+30),0,35)}):Play() end
  task.delay(0.38*S,function() if I.unloaded or I.hidden then return end I:_revealElements(0.025,0.4) I.animating=false end)
 else
  I._sidebarCollapsed=true
@@ -1897,6 +1897,7 @@ else
  f.tweenService:Create(I.sidebar,A,{Size=UDim2.new(0,0,1,-I.layout.chromeHeight)}):Play()
  f.tweenService:Create(I.elements,A,{Size=UDim2.new(1,0,1,-I.layout.chromeHeight),Position=UDim2.new(1,18,1,0)}):Play()
  f.tweenService:Create(I.bottomFade,A,{Size=UDim2.new(1,0,I.layout.fadeSize.Y.Scale,I.layout.fadeSize.Y.Offset)}):Play()
+ if I.searchPill then f.tweenService:Create(I.searchPill,A,{Size=UDim2.new(1,-30,0,35)}):Play() end
  task.delay(0.38*S,function() if I.unloaded or I.hidden then return end f.tweenService:Create(I.elements,B,{Position=UDim2.fromScale(1,1)}):Play() task.wait(0.06*S) if I.unloaded or I.hidden then return end I:_revealElements(0.02,0.4) I.animating=false end)
 end
 end
