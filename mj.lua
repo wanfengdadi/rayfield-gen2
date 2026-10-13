@@ -119,7 +119,7 @@ then return g.guiService:GetGuiInset()end return Vector2.zero end n:Connect(n.co
 if v or not n.hidden or n.animating then return end local w=u.UserInputType.Name if w~='MouseButton1'and w~='Touch'then
 return end p,q=true,false s=o:GetMouseLocation()r=n.main.AbsolutePosition+n.main.AbsoluteSize*n.main.AnchorPoint-s end)n
 :Connect(o.InputEnded,function(u)local v=u.UserInputType.Name if v~='MouseButton1'and v~='Touch'then return end if not p
-then return end p=false if q then n._collapsedPosition=n.main.Position return end local now=os.clock()if now-tClick<0.35 then tClick=0 if tThread then task.cancel(tThread)tThread=nil end k.click()n:Popup{title="Close UI?",content="Are you sure you want to close and unload this interface?",options={{text="Cancel"},{text="Close",style="danger",callback=function()task.wait(0.35)if n.unloaded or not n.main then return end l.setCollapsedShown(n,false,TweenInfo.new(0.25,Enum.EasingStyle.Quint,Enum.EasingDirection.Out))local tw=g.tweenService:Create(n.main,TweenInfo.new(0.35,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{Size=UDim2.fromOffset(0,0),BackgroundTransparency=1})tw:Play()tw.Completed:Wait()n:Unload()end}}}else tClick=now tThread=task.delay(0.35,function()tThread=nil if n.hidden and not n.animating and not n.unloaded then k.click()n:ToggleHide()end end)end end)n:Connect(o
+then return end p=false if q then n._collapsedPosition=n.main.Position return end local now=os.clock()if now-tClick<0.35 then tClick=0 if tThread then task.cancel(tThread)tThread=nil end k.click()local orgPos=n.main.Position local upPos=UDim2.new(orgPos.X.Scale,orgPos.X.Offset,0,-80)local tUp=TweenInfo.new(0.45,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out)n.collapsedInteract.Visible=false l.setCollapsedShown(n,false,tUp)g.tweenService:Create(n.main,tUp,{Position=upPos,BackgroundTransparency=1}):Play()local unl=false n:Popup{title="Close UI?",content="Are you sure you want to close and unload this interface?",onClose=function()if not unl and not n.unloaded and n.hidden and n.main then local tDown=TweenInfo.new(0.4,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out)g.tweenService:Create(n.main,tDown,{Position=orgPos,BackgroundTransparency=0}):Play()l.setCollapsedShown(n,true,tDown)task.delay(tDown.Time,function()if n.hidden and not n.unloaded and n.collapsedInteract then n.collapsedInteract.Visible=true end end)end end,options={{text="Cancel"},{text="Close",style="danger",callback=function()unl=true if n.unloaded or not n.main then return end n:Unload()end}}}else tClick=now tThread=task.delay(0.35,function()tThread=nil if n.hidden and not n.animating and not n.unloaded then k.click()n:ToggleHide()end end)end end)n:Connect(o
 .WindowFocusReleased,function()p=false end)n:Connect(g.runService.RenderStepped,function()if not p then return end if
 not n.hidden or n.animating then p=false return end local u=o:GetMouseLocation()if not q and(u-s).Magnitude<m then
 return end q=true local v=u+r+t()n.main.Position=UDim2.fromOffset(v.X,v.Y)end)end function l.isNewUser()local n=g.
@@ -881,7 +881,7 @@ v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K=n-u*2,16,13,20,10,15,14,8,10,40,8,UDim.new(1,0),
 do local N=J[M]if N._closed or not N.screenGui.Parent then table.remove(J,M)end end end local function M(N)L()return J[#
 J]==N end function ae.new(N,O)O=if typeof(O)=='table'then O else{}local P=setmetatable({window=assert(N,
 'Missing argument #1 (Window expected)'),title=O.title or O.Title or'Popup',subtitle=O.subtitle or O.Subtitle,content=O.
-content or O.Content,icon=O.icon or O.Icon,boxes=O.boxes or O.Boxes,options=O.options or O.Options,dismissable=if O.
+content or O.Content,icon=O.icon or O.Icon,boxes=O.boxes or O.Boxes,options=O.options or O.Options,onClose=O.onClose or O.OnClose,dismissable=if O.
 dismissable~=nil then O.dismissable elseif O.Dismissable~=nil then O.Dismissable else true,_reveal={},_connections={},
 _closed=false},ae)if not P.options or#P.options==0 then P.options={{text='Okay'}}end P:_build()L()table.insert(J,P)task.
 spawn(function()P:_show()end)return P end function ae._fade(N,O,P,Q)table.insert(N._reveal,{instance=O,prop=P,to=Q})
@@ -966,8 +966,7 @@ EasingStyle.Quint,Enum.EasingDirection.Out)table.insert(N._connections,R:Connect
 then return end ag.tweenService:Create(Z,ak,{BackgroundColor3=W}):Play()end))table.insert(N._connections,R:Connect(aj.
 MouseLeave,function()ag.tweenService:Create(Z,ak,{BackgroundColor3=V}):Play()end))table.insert(N._connections,R:Connect(
 aj.MouseButton1Click,function()if N._closed then return end d.click()ag.tweenService:Create(_,ak,{Transparency=1}):Play(
-)if U then task.spawn(function()local al,am=pcall(U)if not al then c.warn("Rayfield: popup button '"..T..
-"' callback errored:")c.print(am)end end)end N:Close()end))end function ae._measureHeader(aj,ak)local al=n-(if ak then r
+)if U then local al,am=pcall(U)if not al then c.warn("Rayfield: popup button '"..T.."' callback errored:")c.print(am)end end N:Close()end))end function ae._measureHeader(aj,ak)local al=n-(if ak then r
 +s else 0)aj._titleH=ah.textHeight(aj.window.theme.Font,o,b.resolve(aj.title),al)aj._subH=if aj.subtitle and aj.subtitle
 ~=''then ah.textHeight(aj.window.theme.Font,p,b.resolve(aj.subtitle),al)else 0 aj._columnH=aj._titleH+(if aj._subH>0
 then 3+aj._subH else 0)return math.max(aj._columnH,if ak then r else 0)end function ae._measureText(aj)return ah.
@@ -979,7 +978,7 @@ or ak.Description if P and P~=''then O=ah.textHeight(aj.window.theme.Font,B,b.re
 am in aj.boxes do ak+=(aj:_measureBox(am))if al<#aj.boxes then ak+=C end end return ak end function ae._show(aj)if not
 aj.screenGui.Parent then return end d.notify()ag.tweenService:Create(aj.card,e,{Position=UDim2.new(0.5,0,0.5,0)}):Play()
 for ak,al in aj._reveal do local am=if al.instance==aj.backdrop then h else f ag.tweenService:Create(al.instance,am,{[al
-.prop]=al.to}):Play()end end function ae.Close(aj)if aj._closed then return end aj._closed=true local ak=table.find(J,aj
+.prop]=al.to}):Play()end end function ae.Close(aj)if aj._closed then return end aj._closed=true if aj.onClose then pcall(aj.onClose) aj.onClose=nil end local ak=table.find(J,aj
 )if ak then table.remove(J,ak)end for al,am in aj._connections do aj.window:Disconnect(am)end aj._connections={}if not
 aj.screenGui.Parent then return end ag.tweenService:Create(aj.card,g,{Position=UDim2.new(0.5,0,0.5,10)}):Play()for al,am
 in aj._reveal do ag.tweenService:Create(am.instance,g,{[am.prop]=1}):Play()end task.delay(g.Time,function()aj.window:
