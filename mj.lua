@@ -1,5 +1,4 @@
--- Rayfield Gen2 v1.2.0-preview (2b179d4, 2026-08-31)
--- loadstring(game:HttpGet("https://sirius.menu/gen2-preview"))()
+-- Rayfield Gen2 v1.2.0-preview (blind v2.5.6.71, 2026-10-20)
 --
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
