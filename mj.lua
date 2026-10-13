@@ -1871,6 +1871,11 @@ if I._sidebarCollapsed then
  I.sidebar.Size=UDim2.new(0,0,1,-I.layout.chromeHeight)
  I.elements.Size=UDim2.new(1,0,1,-I.layout.chromeHeight)
  I:_fadeSelectedElementsOut()
+ if y then
+  local z0=UDim.new(0,0)
+  if I.bottomFadeCorner then f.tweenService:Create(I.bottomFadeCorner,A,{BottomLeftRadius=z0}):Play() end
+  if I.elementsCorner then f.tweenService:Create(I.elementsCorner,A,{BottomLeftRadius=z0}):Play() end
+ end
  if I.sidebarToggleAction and I.sidebarToggleAction.iconLabel then f.tweenService:Create(I.sidebarToggleAction.iconLabel,B,{Rotation=0,ImageTransparency=0.2}):Play() end
  f.tweenService:Create(I.sidebar,A,{Size=UDim2.new(0,width,1,-I.layout.chromeHeight)}):Play()
  f.tweenService:Create(I.elements,A,{Size=UDim2.new(1,-width,1,-I.layout.chromeHeight),Position=UDim2.fromScale(1,1)}):Play()
@@ -1881,6 +1886,11 @@ else
  I._sidebarCollapsed=true
  I._sidebarWidth=width
  I:_fadeSelectedElementsOut()
+ if y then
+  local cR=I.windowCorner and I.windowCorner.CornerRadius or UDim.new(0,I.settings.uiCornerRadius or 12)
+  if I.bottomFadeCorner then f.tweenService:Create(I.bottomFadeCorner,A,{BottomLeftRadius=cR}):Play() end
+  if I.elementsCorner then f.tweenService:Create(I.elementsCorner,A,{BottomLeftRadius=cR}):Play() end
+ end
  if I.sidebarToggleAction and I.sidebarToggleAction.iconLabel then f.tweenService:Create(I.sidebarToggleAction.iconLabel,B,{Rotation=180,ImageTransparency=0.6}):Play() end
  f.tweenService:Create(I.sidebar,A,{Size=UDim2.new(0,0,1,-I.layout.chromeHeight)}):Play()
  f.tweenService:Create(I.elements,A,{Size=UDim2.new(1,0,1,-I.layout.chromeHeight),Position=UDim2.new(1,18,1,0)}):Play()
